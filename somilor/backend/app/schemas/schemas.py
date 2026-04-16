@@ -179,3 +179,17 @@ class DashboardKPIs(BaseModel):
     mantenimientos_vencidos: int
     mantenimientos_proximos: int
     checklists_reprobados_hoy: int
+
+from typing import Optional # (Asegúrate de que 'Optional' esté importado arriba junto con List, BaseModel, etc.)
+
+class CatalogoMantenimientoBase(BaseModel):
+    tipo_vehiculo: str
+    tipo_mantenimiento: str
+    descripcion: str
+    frecuencia_estimada: Optional[str] = None
+
+class CatalogoMantenimientoResponse(CatalogoMantenimientoBase):
+    id: int
+
+    class Config:
+        from_attributes = True

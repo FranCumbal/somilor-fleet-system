@@ -159,3 +159,12 @@ class Checklist(Base):
 
     vehiculo = relationship("Vehiculo", back_populates="checklists")
     chofer = relationship("Chofer", back_populates="checklists")
+
+class CatalogoMantenimiento(Base):
+    __tablename__ = "catalogo_mantenimientos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tipo_vehiculo = Column(String(20), nullable=False)
+    tipo_mantenimiento = Column(String(20), nullable=False)
+    descripcion = Column(String(255), nullable=False)
+    frecuencia_estimada = Column(String(100), nullable=True)
