@@ -2,8 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import Base, engine
-# Importamos los routers con los nombres que ya tienes en tu carpeta
-from app.routers import auth, vehiculos, choferes, combustible, mantenimiento, checklist, dashboard, catalogos
+from app.routers import auth, vehiculos, choferes, combustible, mantenimiento, checklist, dashboard
 
 # Crear tablas si no existen
 Base.metadata.create_all(bind=engine)
@@ -23,8 +22,6 @@ app.add_middleware(
 )
 
 PREFIX = "/api/v1"
-
-# Registro de rutas (routers)
 app.include_router(auth.router, prefix=PREFIX)
 app.include_router(vehiculos.router, prefix=PREFIX)
 app.include_router(choferes.router, prefix=PREFIX)
@@ -32,8 +29,7 @@ app.include_router(combustible.router, prefix=PREFIX)
 app.include_router(mantenimiento.router, prefix=PREFIX)
 app.include_router(checklist.router, prefix=PREFIX)
 app.include_router(dashboard.router, prefix=PREFIX)
-# El catálogo lo registramos bajo el mismo prefijo
-app.include_router(catalogos.router, prefix=PREFIX)
+
 
 @app.get("/")
 def root():
