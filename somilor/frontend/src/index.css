@@ -1,0 +1,45 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --gold: #C8A84B;
+  --gold-light: #E2C97A;
+  --gold-dim: #8B7233;
+  --dark-bg: #0E1117;
+  --panel: #161B26;
+  --panel2: #1C2232;
+  --panel3: #222A3D;
+  --border: rgba(200,168,75,0.18);
+  --border-soft: rgba(255,255,255,0.06);
+  --text-1: #F0EDE6;
+  --text-2: #9BA3B8;
+  --text-3: #5C6480;
+  --red: #E05252;
+  --green: #3DC87A;
+  --amber: #F0A742;
+  --blue: #4D9CF0;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--dark-bg);
+  color: var(--text-1);
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100vh;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--panel); }
+::-webkit-scrollbar-thumb { background: var(--panel3); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--gold-dim); }
+
+/* Utilities */
+.font-mono { font-family: 'Space Mono', monospace; }
+
+.status-operativo { color: var(--green); background: rgba(61,200,122,0.1); }
+.status-taller    { color: var(--red);   background: rgba(224,82,82,0.1); }
+.status-libre     { color: var(--amber); background: rgba(240,167,66,0.1); }
