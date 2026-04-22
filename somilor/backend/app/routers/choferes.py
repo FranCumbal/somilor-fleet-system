@@ -10,7 +10,7 @@ router = APIRouter(prefix="/choferes", tags=["Choferes"])
 
 @router.get("/", response_model=List[ChoferOut])
 def listar_choferes(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return db.query(Chofer).filter(Chofer.activo == True).offset(skip).limit(limit).all()
+    return db.query(Chofer).filter(Chofer.activo == True).order_by(Chofer.id).offset(skip).limit(limit).all()
 
 
 @router.get("/{chofer_id}", response_model=ChoferOut)

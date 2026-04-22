@@ -11,11 +11,9 @@ class EstadoVehiculo(str, enum.Enum):
     libre = "libre"
 
 class TipoVehiculo(str, enum.Enum):
-    camioneta = "camioneta"
-    volqueta = "volqueta"
-    excavadora = "excavadora"
-    buldocer = "buldocer"
-    otro = "otro"
+    liviano = "liviano"
+    pesado = "pesado"
+    maquinaria = "maquinaria"
 
 class TipoMantenimiento(str, enum.Enum):
     preventivo = "preventivo"
@@ -63,6 +61,7 @@ class Vehiculo(Base):
     modelo = Column(String(80))
     anio = Column(Integer)
     placa = Column(String(20), unique=True)
+    color = Column(String(50))
     tipo = Column(Enum(TipoVehiculo), nullable=False)
     estado = Column(Enum(EstadoVehiculo), default=EstadoVehiculo.libre)
     kilometraje_actual = Column(Float, default=0)

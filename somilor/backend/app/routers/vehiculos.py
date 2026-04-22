@@ -21,7 +21,7 @@ def listar_vehiculos(
         q = q.filter(Vehiculo.estado == estado)
     if tipo:
         q = q.filter(Vehiculo.tipo == tipo)
-    return q.offset(skip).limit(limit).all()
+    return q.order_by(Vehiculo.id).offset(skip).limit(limit).all()
 
 
 @router.get("/{vehiculo_id}", response_model=VehiculoOut)

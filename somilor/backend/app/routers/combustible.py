@@ -5,7 +5,7 @@ from typing import List, Optional
 from datetime import date, datetime
 from app.database import get_db
 from app.models import Tanqueo, Vehiculo
-from app.schemas import TanqueoCreate, TanqueoOut
+from app.schemas import TanqueoCreate, TanqueoOut, TanqueoUpdate
 
 router = APIRouter(prefix="/combustible", tags=["Combustible"])
 
@@ -105,3 +105,28 @@ def consumo_por_vehiculo(db: Session = Depends(get_db)):
         }
         for r in resultados
     ]
+
+@router.patch("/{tanqueo_id}", response_model=TanqueoOut)
+def actualizar_tanqueo(tanqueo_id: int, update: TanqueoUpdate, db: Session = Depends(get_db)):
+    t = db.query(Tanqueo).filter(Tanqueo.id == tanqueo_id).first()
+    if not t:
+        raise HTTPException(status_code=404, detail="Tanqueo no encontrado")
+    for field, value in update.model_dump(exclude_unset=True).items():
+        setattr(t, field, value)
+
+    # Recalcular rendimiento si se modificaron datos relevantes
+    if 'km_inicial' in update.model_dump(exclude_unset=True) or 'km_final' in update.model_dump(exclude_unset=True) or 'litros' in update.model_dump(exclude_unset=True):
+        t.rendimiento_km_l = calcular_rendimiento(t.km_inicial, t.km_final, t.litros)
+        t.es_anomalia = detectar_anomalia(db, t.vehiculo_id, t.rendimiento_km_l)
+
+    db.commit()
+    db.refresh(t)
+    return t
+
+@router.delete("/{tanqueo_id}", status_code=status.HTTP_204_NO_CONTENT)
+def eliminar_tanqueo(tanqueo_id: int, db: Session = Depends(get_db)):
+    t = db.query(Tanqueo).filter(Tanqueo.id == tanqueo_id).first()
+    if not t:
+        raise HTTPException(status_code=404, detail="Tanqueo no encontrado")
+    db.delete(t)
+    db.commit()

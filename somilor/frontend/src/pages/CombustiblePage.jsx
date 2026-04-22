@@ -14,12 +14,18 @@ export default function CombustiblePage() {
   const [choferes, setChoferes] = useState([])
   const [resumenHoy, setResumenHoy] = useState(null)
   const [loading, setLoading] = useState(true)
+  
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ vehiculo_id:'', chofer_id:'', litros:'', km_inicial:'', km_final:'', precio_litro:'1.10', observaciones:'' })
+  const [editandoId, setEditandoId] = useState(null)
+  
+  const estadoInicial = { vehiculo_id:'', chofer_id:'', litros:'', km_inicial:'', km_final:'', precio_litro:'1.10', observaciones:'' }
+  const [form, setForm] = useState(estadoInicial)
+  
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => {
+  const cargar = () => {
+    setLoading(true)
     Promise.all([
       combustibleAPI.list({ limit:20 }),
       vehiculosAPI.list(),
@@ -28,7 +34,9 @@ export default function CombustiblePage() {
     ]).then(([t, v, c, r]) => {
       setTanqueos(t.data); setVehiculos(v.data); setChoferes(c.data); setResumenHoy(r.data)
     }).catch(() => {}).finally(() => setLoading(false))
-  }, [])
+  }
+
+  useEffect(() => { cargar() }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault(); setSaving(true); setError('')
@@ -43,12 +51,50 @@ export default function CombustiblePage() {
         costo_total: form.litros && form.precio_litro ? parseFloat(form.litros) * parseFloat(form.precio_litro) : null,
         observaciones: form.observaciones || null,
       }
-      await combustibleAPI.create(payload)
-      setShowForm(false)
-      const [t, r] = await Promise.all([combustibleAPI.list({ limit:20 }), combustibleAPI.resumenHoy()])
-      setTanqueos(t.data); setResumenHoy(r.data)
-    } catch (err) { setError(err.response?.data?.detail || 'Error al registrar') }
+      
+      if (editandoId) {
+        await combustibleAPI.update(editandoId, payload)
+      } else {
+        await combustibleAPI.create(payload)
+      }
+      
+      cerrarFormulario()
+      cargar()
+    } catch (err) { setError(err.response?.data?.detail || 'Error al guardar') }
     finally { setSaving(false) }
+  }
+
+  const cargarDatosEdicion = (t) => {
+    setEditandoId(t.id)
+    setForm({
+      vehiculo_id: t.vehiculo_id || '',
+      chofer_id: t.chofer_id || '',
+      litros: t.litros || '',
+      km_inicial: t.km_inicial || '',
+      km_final: t.km_final || '',
+      precio_litro: t.precio_litro || '',
+      observaciones: t.observaciones || ''
+    })
+    setShowForm(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const cerrarFormulario = () => {
+    setShowForm(false)
+    setEditandoId(null)
+    setForm(estadoInicial)
+    setError('')
+  }
+
+  const eliminarTanqueo = async (id) => {
+    if (window.confirm(`¿Estás seguro de eliminar este registro de tanqueo?`)) {
+      try {
+        await combustibleAPI.delete(id)
+        cargar()
+      } catch (err) {
+        alert('Error al eliminar el registro')
+      }
+    }
   }
 
   const anomalias = tanqueos.filter(t => t.es_anomalia).length
@@ -58,7 +104,7 @@ export default function CombustiblePage() {
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
       <PageHeader title="Gestión de Combustible" subtitle="Control de tanqueos y rendimiento">
-        <Btn variant="primary" onClick={() => setShowForm(!showForm)}>+ Registrar tanqueo</Btn>
+        <Btn variant="primary" onClick={() => { cerrarFormulario(); setShowForm(!showForm); }}>+ Registrar tanqueo</Btn>
       </PageHeader>
 
       {/* KPIs */}
@@ -79,7 +125,7 @@ export default function CombustiblePage() {
 
       {/* Gráfico */}
       <Panel>
-        <PanelHeader title="Consumo diario — abril 2026 (litros)" />
+        <PanelHeader title="Consumo diario — mes actual (litros)" />
         <div style={{ padding:'20px 20px 10px' }}>
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={fuelDays} margin={{ top:10, right:10, left:-20, bottom:0 }}>
@@ -97,8 +143,8 @@ export default function CombustiblePage() {
       {/* Formulario */}
       {showForm && (
         <Panel>
-          <PanelHeader title="Registrar tanqueo">
-            <Btn variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Btn>
+          <PanelHeader title={editandoId ? "Editar tanqueo" : "Registrar tanqueo"}>
+            <Btn variant="ghost" onClick={cerrarFormulario}>Cancelar</Btn>
           </PanelHeader>
           <form onSubmit={handleSubmit} style={{ padding:20, display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:16 }}>
             <div>
@@ -106,7 +152,7 @@ export default function CombustiblePage() {
               <select value={form.vehiculo_id} onChange={e => setForm(p=>({...p, vehiculo_id:e.target.value}))} required
                 style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none' }}>
                 <option value="">Seleccionar...</option>
-                {vehiculos.map(v => <option key={v.id} value={v.id}>{v.codigo} — {v.marca} {v.modelo}</option>)}
+                {vehiculos.map(v => <option key={v.id} value={v.id}>{v.placa || v.codigo} — {v.marca} {v.modelo} ({v.color || 'S/C'})</option>)}
               </select>
             </div>
             <div>
@@ -139,9 +185,9 @@ export default function CombustiblePage() {
             </div>
             {error && <div style={{ gridColumn:'1/-1', color:'var(--red)', fontSize:12, background:'rgba(224,82,82,0.1)', padding:'8px 12px', borderRadius:8 }}>{error}</div>}
             <div style={{ gridColumn:'1/-1', display:'flex', justifyContent:'flex-end', gap:8 }}>
-              <Btn variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Btn>
+              <Btn variant="ghost" onClick={cerrarFormulario}>Cancelar</Btn>
               <button type="submit" disabled={saving} style={{ padding:'8px 20px', borderRadius:8, background:'var(--gold)', color:'#0E1117', border:'none', fontWeight:600, cursor:'pointer', fontSize:13 }}>
-                {saving ? 'Guardando...' : 'Registrar tanqueo'}
+                {saving ? 'Guardando...' : (editandoId ? 'Actualizar tanqueo' : 'Registrar tanqueo')}
               </button>
             </div>
           </form>
@@ -155,7 +201,7 @@ export default function CombustiblePage() {
           <table style={{ width:'100%', borderCollapse:'collapse' }}>
             <thead>
               <tr>
-                {['Fecha','Vehículo','Chofer','Litros','KM inicial','KM final','Rendimiento','Estado'].map(h => (
+                {['Fecha','Placa/Vehículo','Chofer','Litros','KM inicial','KM final','Rendimiento','Estado','Acciones'].map(h => (
                   <th key={h} style={{ padding:'10px 20px', textAlign:'left', fontSize:10, fontWeight:500, textTransform:'uppercase', letterSpacing:'0.12em', color:'var(--text-3)', borderBottom:'1px solid var(--border-soft)', background:'var(--panel2)' }}>{h}</th>
                 ))}
               </tr>
@@ -165,14 +211,19 @@ export default function CombustiblePage() {
                 <tr key={t.id}
                   onMouseEnter={e => e.currentTarget.style.background='var(--panel2)'}
                   onMouseLeave={e => e.currentTarget.style.background='transparent'}
-                  style={{ cursor:'pointer', transition:'background 0.15s' }}>
+                  style={{ transition:'background 0.15s' }}>
                   <td style={{ padding:'13px 20px', fontSize:11, fontFamily:'Space Mono', color:'var(--text-3)', borderBottom:'1px solid var(--border-soft)' }}>
                     {new Date(t.fecha).toLocaleString('es-EC', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })}
                   </td>
                   <td style={{ padding:'13px 20px', borderBottom:'1px solid var(--border-soft)' }}>
-                    <span style={{ fontFamily:'Space Mono', fontSize:12, color:'var(--gold-light)', fontWeight:700 }}>{t.vehiculo?.codigo ?? `V-${t.vehiculo_id}`}</span>
+                    <div style={{ fontFamily:'Space Mono', fontSize:12, color:'var(--gold-light)', fontWeight:700 }}>
+                      {t.vehiculo?.placa || t.vehiculo?.codigo || `V-${t.vehiculo_id}`}
+                    </div>
+                    {t.vehiculo?.marca && <div style={{ fontSize:10, color:'var(--text-3)' }}>{t.vehiculo.marca} {t.vehiculo.modelo}</div>}
                   </td>
-                  <td style={{ padding:'13px 20px', fontSize:13, color:'var(--text-2)', borderBottom:'1px solid var(--border-soft)' }}>{t.chofer_id ? `C-${t.chofer_id}` : '—'}</td>
+                  <td style={{ padding:'13px 20px', fontSize:13, color:'var(--text-2)', borderBottom:'1px solid var(--border-soft)' }}>
+                    {t.chofer ? `${t.chofer.nombre} ${t.chofer.apellido}` : '—'}
+                  </td>
                   <td style={{ padding:'13px 20px', fontSize:13, fontFamily:'Space Mono', borderBottom:'1px solid var(--border-soft)' }}>{t.litros} L</td>
                   <td style={{ padding:'13px 20px', fontSize:12, fontFamily:'Space Mono', color:'var(--text-2)', borderBottom:'1px solid var(--border-soft)' }}>{t.km_inicial?.toLocaleString() ?? '—'}</td>
                   <td style={{ padding:'13px 20px', fontSize:12, fontFamily:'Space Mono', color:'var(--text-2)', borderBottom:'1px solid var(--border-soft)' }}>{t.km_final?.toLocaleString() ?? '—'}</td>
@@ -186,6 +237,16 @@ export default function CombustiblePage() {
                       ? <span style={{ fontSize:11, color:'var(--red)', background:'rgba(224,82,82,0.1)', padding:'3px 8px', borderRadius:8, fontWeight:600 }}>⚠ Anomalía</span>
                       : <span style={{ fontSize:11, color:'var(--green)' }}>Normal</span>
                     }
+                  </td>
+                  <td style={{ padding:'13px 20px', borderBottom:'1px solid var(--border-soft)' }}>
+                    <div style={{ display:'flex', gap:8 }}>
+                      <button onClick={() => cargarDatosEdicion(t)} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(77,156,240,0.1)', color:'var(--blue)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }} title="Editar">
+                        ✏️
+                      </button>
+                      <button onClick={() => eliminarTanqueo(t.id)} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(224,82,82,0.1)', color:'var(--red)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }} title="Eliminar">
+                        🗑️
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

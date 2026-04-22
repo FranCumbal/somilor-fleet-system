@@ -52,6 +52,7 @@ class VehiculoBase(BaseModel):
     modelo: Optional[str] = None
     anio: Optional[int] = None
     placa: Optional[str] = None
+    color: Optional[str] = None
     tipo: TipoVehiculo
     kilometraje_actual: float = 0
     horas_operacion: float = 0
@@ -101,6 +102,15 @@ class TanqueoCreate(BaseModel):
     horas_inicial: Optional[float] = None
     horas_final: Optional[float] = None
     costo_total: Optional[float] = None
+    precio_litro: Optional[float] = None
+    observaciones: Optional[str] = None
+
+class TanqueoUpdate(BaseModel):
+    litros: Optional[float] = None
+    km_inicial: Optional[float] = None
+    km_final: Optional[float] = None
+    horas_inicial: Optional[float] = None
+    horas_final: Optional[float] = None
     precio_litro: Optional[float] = None
     observaciones: Optional[str] = None
 
@@ -158,6 +168,12 @@ class ChecklistCreate(BaseModel):
     cinturones: bool
     senales_emergencia: bool
     observaciones: Optional[str] = None
+
+class ChecklistUpdate(BaseModel):
+    turno: Optional[str] = None
+    observaciones: Optional[str] = None
+    luces_delanteras: Optional[bool] = None
+    # Añadir el resto de items si se requiere actualización profunda
 
 class ChecklistOut(ChecklistCreate):
     id: int

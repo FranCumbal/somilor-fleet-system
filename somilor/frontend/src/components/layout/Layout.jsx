@@ -1,4 +1,5 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 
 const navItems = [
@@ -13,6 +14,22 @@ const navItems = [
 export default function Layout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+
+  // 1. Estado para el tema (busca en localStorage o usa 'dark' por defecto)
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark')
+
+  // 2. Efecto para aplicar la clase al <body> cuando cambia el tema
+  useEffect(() => {
+    if (theme === 'light') {
+      document.body.classList.add('light-theme')
+    } else {
+      document.body.classList.remove('light-theme')
+    }
+    localStorage.setItem('theme', theme)
+  }, [theme])
+
+  // 3. Función para alternar el estado
+  const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark')
 
   const handleLogout = () => { logout(); navigate('/login') }
 
@@ -38,6 +55,15 @@ export default function Layout() {
         </div>
 
         <div style={{ display:'flex', alignItems:'center', gap:16 }}>
+          {/* 4. Botón para alternar el tema */}
+          <button onClick={toggleTheme} style={{
+            background:'transparent', border:'none', fontSize:18, cursor:'pointer',
+            padding:4, display:'flex', alignItems:'center', justifyContent:'center',
+            color:'var(--text-2)'
+          }}>
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
+
           <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:'var(--green)', fontFamily:'Space Mono' }}>
             <div style={{
               width:7, height:7, borderRadius:'50%', background:'var(--green)',

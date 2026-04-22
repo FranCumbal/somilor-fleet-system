@@ -56,6 +56,8 @@ export const choferesAPI = {
 export const combustibleAPI = {
   list: (params) => api.get('/combustible', { params }),
   create: (data) => api.post('/combustible', data),
+  update: (id, data) => api.patch(`/combustible/${id}`, data),
+  delete: (id) => api.delete(`/combustible/${id}`),
   resumenHoy: () => api.get('/combustible/resumen/hoy'),
   resumenPorVehiculo: () => api.get('/combustible/resumen/por-vehiculo'),
 }
@@ -65,11 +67,14 @@ export const mantenimientoAPI = {
   alertas: () => api.get('/mantenimiento/alertas'),
   create: (data) => api.post('/mantenimiento', data),
   update: (id, data) => api.patch(`/mantenimiento/${id}`, data),
+  delete: (id) => api.delete(`/mantenimiento/${id}`),
 }
 
 export const checklistAPI = {
   list: (params) => api.get('/checklist', { params }),
   create: (data) => api.post('/checklist', data),
+  update: (id, data) => api.patch(`/checklist/${id}`, data),
+  delete: (id) => api.delete(`/checklist/${id}`),
   resumenHoy: () => api.get('/checklist/hoy/resumen'),
 }
 

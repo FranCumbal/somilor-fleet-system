@@ -81,3 +81,11 @@ def actualizar_mantenimiento(mantenimiento_id: int, update: MantenimientoUpdate,
     db.commit()
     db.refresh(m)
     return m
+
+@router.delete("/{mantenimiento_id}", status_code=status.HTTP_204_NO_CONTENT)
+def eliminar_mantenimiento(mantenimiento_id: int, db: Session = Depends(get_db)):
+    m = db.query(Mantenimiento).filter(Mantenimiento.id == mantenimiento_id).first()
+    if not m:
+        raise HTTPException(status_code=404, detail="Mantenimiento no encontrado")
+    db.delete(m)
+    db.commit()
