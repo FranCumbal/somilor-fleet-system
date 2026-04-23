@@ -121,6 +121,7 @@ class Mantenimiento(Base):
     fecha_programada = Column(DateTime(timezone=True))
     fecha_realizado = Column(DateTime(timezone=True), nullable=True)
     km_programado = Column(Float)
+    costo = Column(Float, nullable=True)
     km_realizado = Column(Float, nullable=True)
     horas_programado = Column(Float)
     costo = Column(Float)

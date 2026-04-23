@@ -131,9 +131,19 @@ class MantenimientoCreate(BaseModel):
     km_programado: Optional[float] = None
     horas_programado: Optional[float] = None
     taller: Optional[str] = None
+    costo: Optional[float] = None  # <--- Faltaba aquí para poder recibirlo al crear
     observaciones: Optional[str] = None
 
 class MantenimientoUpdate(BaseModel):
+    # Agregamos estos campos como opcionales para que el botón "Editar" del frontend funcione
+    vehiculo_id: Optional[int] = None
+    tipo: Optional[TipoMantenimiento] = None
+    descripcion: Optional[str] = None
+    fecha_programada: Optional[datetime] = None
+    km_programado: Optional[float] = None
+    horas_programado: Optional[float] = None
+    taller: Optional[str] = None
+    observaciones: Optional[str] = None
     estado: Optional[EstadoMantenimiento] = None
     fecha_realizado: Optional[datetime] = None
     km_realizado: Optional[float] = None
@@ -144,7 +154,6 @@ class MantenimientoOut(MantenimientoCreate):
     estado: EstadoMantenimiento
     fecha_realizado: Optional[datetime]
     km_realizado: Optional[float]
-    costo: Optional[float]
     creado_en: datetime
     vehiculo: VehiculoOut
     class Config: from_attributes = True
