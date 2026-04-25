@@ -34,9 +34,9 @@ def obtener_vehiculo(vehiculo_id: int, db: Session = Depends(get_db)):
 
 @router.post("/", response_model=VehiculoOut, status_code=status.HTTP_201_CREATED)
 def crear_vehiculo(vehiculo: VehiculoCreate, db: Session = Depends(get_db)):
-    existing = db.query(Vehiculo).filter(Vehiculo.codigo == vehiculo.codigo).first()
+    existing = db.query(Vehiculo).filter(Vehiculo.placa == vehiculo.placa).first()
     if existing:
-        raise HTTPException(status_code=400, detail="El código de vehículo ya existe")
+        raise HTTPException(status_code=400, detail="Esta placa ya está registrada")
     db_v = Vehiculo(**vehiculo.model_dump())
     db.add(db_v)
     db.commit()

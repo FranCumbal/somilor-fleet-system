@@ -4,7 +4,6 @@ from sqlalchemy import func, cast, Date, desc
 from datetime import date, datetime, timedelta
 from app.database import get_db
 
-# Asegúrate de tener importados todos tus modelos, incluyendo Asignacion
 from app.models import Vehiculo, Chofer, Tanqueo, Mantenimiento, Checklist, Asignacion
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
@@ -19,16 +18,15 @@ def obtener_kpis(db: Session = Depends(get_db)):
     # 1. KPIs BÁSICOS
     # ==========================================
     operativos = db.query(func.count(Vehiculo.id)).filter(Vehiculo.estado == 'operativo', Vehiculo.activo == True).scalar() or 0
-    taller = db.query(func.count(Vehiculo.id)).filter(Vehiculo.estado == 'en_taller', Vehiculo.activo == True).scalar() or 0
+    taller = db.query(func.count(Vehiculo.id)).filter(Vehiculo.estado == 'taller', Vehiculo.activo == True).scalar() or 0
     libres = db.query(func.count(Vehiculo.id)).filter(Vehiculo.estado == 'libre', Vehiculo.activo == True).scalar() or 0
     choferes_activos = db.query(func.count(Chofer.id)).filter(Chofer.activo == True).scalar() or 0
 
     # ==========================================
-    # 2. COMBUSTIBLE (Hoy y Semana)
+    # 2. COMBUSTIBLE (Hoy y Semana) - Solo Costos
     # ==========================================
     combustible_hoy = db.query(func.sum(Tanqueo.costo_total)).filter(cast(Tanqueo.fecha, Date) == hoy).scalar() or 0
 
-    # Agrupamos los costos de los últimos 7 días
     tanqueos_semana = db.query(
         cast(Tanqueo.fecha, Date).label('fecha'),
         func.sum(Tanqueo.costo_total).label('total')
@@ -43,17 +41,16 @@ def obtener_kpis(db: Session = Depends(get_db)):
         nombre = 'Hoy' if i == 0 else dias_espanol[d.weekday()]
         fuel_data.append({
             "dia": nombre,
-            "costo": costos_por_dia.get(d, 0.0) # Si no hubo tanqueo ese día, pone 0
+            "costo": costos_por_dia.get(d, 0.0) 
         })
 
     # ==========================================
-    # 3. LISTA DE FLOTA (Cruzando con Choferes)
+    # 3. LISTA DE FLOTA
     # ==========================================
     flota_db = db.query(Vehiculo).filter(Vehiculo.activo == True).all()
     flota_completa = []
     
     for v in flota_db:
-        # Buscamos quién tiene asignado este vehículo actualmente
         asignacion = db.query(Asignacion).filter(Asignacion.vehiculo_id == v.id, Asignacion.activa == True).first()
         responsable = "Sin asignar"
         
@@ -90,11 +87,10 @@ def obtener_kpis(db: Session = Depends(get_db)):
         })
 
     # ==========================================
-    # 5. ALERTAS (Checklists y Anomalías)
+    # 5. ALERTAS (Solo Checklists Reprobados)
     # ==========================================
     alertas = []
     
-    # Checklists reprobados (Últimos 5)
     checklists = db.query(Checklist, Vehiculo).join(Vehiculo).filter(
         Checklist.aprobado == False
     ).order_by(desc(Checklist.fecha)).limit(5).all()
@@ -107,20 +103,6 @@ def obtener_kpis(db: Session = Depends(get_db)):
             "tiempo": c.fecha.strftime('%d/%m %H:%M')
         })
 
-    # Anomalías de Combustible (Últimas 5)
-    anomalias = db.query(Tanqueo, Vehiculo).join(Vehiculo).filter(
-        Tanqueo.es_anomalia == True
-    ).order_by(desc(Tanqueo.fecha)).limit(5).all()
-
-    for t, v in anomalias:
-        alertas.append({
-            "tipo": "amber",
-            "titulo": f"Anomalía Combustible — {v.placa or v.codigo}",
-            "desc": f"Carga atípica de {t.litros} L (${t.costo_total})",
-            "tiempo": t.fecha.strftime('%d/%m %H:%M')
-        })
-
-    # Empaquetamos absolutamente todo en un solo JSON estructurado
     return {
         "vehiculos_operativos": operativos,
         "vehiculos_taller": taller,

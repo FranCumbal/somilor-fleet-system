@@ -5,6 +5,12 @@ import { Panel, PanelHeader, PageHeader, Btn, StatusPill, Chip, LoadingSpinner, 
 const idUnico = () => Math.random().toString(36).substr(2, 9)
 const estadoInicialForm = { tipo_vehiculo:'', vehiculo_id:'', tipo:'preventivo', descripcion:'', fecha_programada:'', km_programado:'', taller:'', costo:'', observaciones:'' }
 
+const preventInvalidChars = (e) => {
+  if (['e', 'E', '+', '-'].includes(e.key)) {
+    e.preventDefault()
+  }
+}
+
 export default function MantenimientoPage() {
   const [mantenimientos, setMantenimientos] = useState([])
   const [vehiculos, setVehiculos] = useState([])
@@ -12,12 +18,14 @@ export default function MantenimientoPage() {
   const [alertas, setAlertas] = useState(null)
   const [loading, setLoading] = useState(true)
   const [filtro, setFiltro] = useState('todos')
+  
   const [showForm, setShowForm] = useState(false)
   const [editandoId, setEditandoId] = useState(null)
-  
   const [formularios, setFormularios] = useState([{ idRef: idUnico(), ...estadoInicialForm }])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  const [detalleActivo, setDetalleActivo] = useState(null)
 
   const cargar = () => {
     const params = {}
@@ -29,7 +37,14 @@ export default function MantenimientoPage() {
       mantenimientoAPI.alertas(),
       mantenimientoAPI.catalogo()
     ]).then(([m, v, a, cat]) => {
-      setMantenimientos(m.data); setVehiculos(v.data); setAlertas(a.data); setCatalogoDB(cat.data)
+      const mantenimientosCompletos = m.data.map(mant => ({
+        ...mant,
+        vehiculo: v.data.find(veh => veh.id === mant.vehiculo_id)
+      }))
+      setMantenimientos(mantenimientosCompletos); 
+      setVehiculos(v.data); 
+      setAlertas(a.data); 
+      setCatalogoDB(cat.data)
     }).catch(() => {}).finally(() => setLoading(false))
   }
 
@@ -152,9 +167,15 @@ export default function MantenimientoPage() {
     }, {})
   }
 
+  const ahora = new Date()
+  const en7Dias = new Date(ahora.getTime() + 7 * 24 * 60 * 60 * 1000)
+
+  const mantsVencidos = mantenimientos.filter(m => m.estado === 'vencido' || (m.estado === 'programado' && m.fecha_programada && new Date(m.fecha_programada) < ahora))
+  const mantsProximos = mantenimientos.filter(m => m.estado === 'programado' && m.fecha_programada && new Date(m.fecha_programada) >= ahora && new Date(m.fecha_programada) <= en7Dias)
+  const mantsCompletados = mantenimientos.filter(m => m.estado === 'completado')
+
   return (
-    /* MAGIA 1: minWidth: 0, width: 100% para frenar el Flexbox Blowout */
-    <div style={{ display:'flex', flexDirection:'column', gap:20, minWidth: 0, width: '100%' }}>
+    <div style={{ display:'flex', flexDirection:'column', gap:20, minWidth: 0, width: '100%', position: 'relative' }}>
       <PageHeader title="Gestión de Mantenimiento" subtitle="Control preventivo y correctivo">
         <Btn variant={showForm ? "ghost" : "primary"} onClick={() => { cerrarFormulario(); setShowForm(!showForm); }}>
           {showForm ? 'Volver al panel' : '+ Registrar mantenimiento'}
@@ -179,7 +200,8 @@ export default function MantenimientoPage() {
                 </PanelHeader>
 
                 {!esEsclavo ? (
-                  <div style={{ padding:20, display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:16 }}>
+                  // MAGIA RESPONSIVA: repeat(auto-fit, minmax(220px, 1fr)) asegura que en móvil se apilen automáticamente
+                  <div style={{ padding:20, display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:16 }}>
                     <div>
                       <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Filtrar Categoría</label>
                       <select value={f.tipo_vehiculo} onChange={e => { updateField(f.idRef, 'tipo_vehiculo', e.target.value); updateField(f.idRef, 'vehiculo_id', ''); }}
@@ -214,16 +236,22 @@ export default function MantenimientoPage() {
                     </div>
                     <div>
                       <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Kilometraje / Horas</label>
-                      <input type="number" placeholder="Ej: 85000" value={f.km_programado} onChange={e => updateField(f.idRef, 'km_programado', e.target.value)}
+                      {/* VALIDACIÓN NUMÉRICA */}
+                      <input type="number" min="0" step="any" placeholder="Ej: 85000" value={f.km_programado} 
+                        onChange={e => updateField(f.idRef, 'km_programado', e.target.value)}
+                        onKeyDown={preventInvalidChars}
                         style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none' }} />
                     </div>
                     <div>
                       <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Costo Total ($)</label>
-                      <input type="number" step="any" placeholder="0.00" value={f.costo} onChange={e => updateField(f.idRef, 'costo', e.target.value)}
+                      {/* VALIDACIÓN NUMÉRICA */}
+                      <input type="number" min="0" step="any" placeholder="0.00" value={f.costo} 
+                        onChange={e => updateField(f.idRef, 'costo', e.target.value)}
+                        onKeyDown={preventInvalidChars}
                         style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none' }} />
                     </div>
 
-                    <div style={{ gridColumn:'1/3' }}>
+                    <div style={{ gridColumn:'1/-1' }}>
                       <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Procedimiento Específico *</label>
                       <select required value={f.descripcion} onChange={e => updateField(f.idRef, 'descripcion', e.target.value)}
                         style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none', opacity: f.vehiculo_id ? 1 : 0.5 }}>
@@ -247,7 +275,8 @@ export default function MantenimientoPage() {
                     </div>
                   </div>
                 ) : (
-                  <div style={{ padding:20, display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:16, background:'rgba(255,255,255,0.01)' }}>
+                  // MAGIA RESPONSIVA TAMBIÉN PARA EL ESCLAVO
+                  <div style={{ padding:20, display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:16, background:'rgba(255,255,255,0.01)' }}>
                     <div>
                       <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Tipo de Trabajo *</label>
                       <select value={f.tipo} onChange={e => updateField(f.idRef, 'tipo', e.target.value)}
@@ -263,7 +292,10 @@ export default function MantenimientoPage() {
                     </div>
                     <div>
                       <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Costo Extra ($)</label>
-                      <input type="number" step="any" placeholder="0.00" value={f.costo} onChange={e => updateField(f.idRef, 'costo', e.target.value)}
+                      {/* VALIDACIÓN NUMÉRICA */}
+                      <input type="number" min="0" step="any" placeholder="0.00" value={f.costo} 
+                        onChange={e => updateField(f.idRef, 'costo', e.target.value)}
+                        onKeyDown={preventInvalidChars}
                         style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none' }} />
                     </div>
                     
@@ -308,23 +340,25 @@ export default function MantenimientoPage() {
         <>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14 }}>
             {[
-              { label:'Vencidos', value: alertas?.vencidos ?? '—', accent:'var(--red)' },
-              { label:'Próximos 7 días', value: alertas?.proximos_7_dias ?? '—', accent:'var(--amber)' },
-              { label:'Total registros', value: mantenimientos.length, accent:'var(--blue)' },
-              { label:'Completados', value: mantenimientos.filter(m=>m.estado==='completado').length, accent:'var(--green)' },
+              { label:'Vencidos', value: mantsVencidos.length, accent:'var(--red)', data: mantsVencidos },
+              { label:'Próximos 7 días', value: mantsProximos.length, accent:'var(--amber)', data: mantsProximos },
+              { label:'Total registros', value: mantenimientos.length, accent:'var(--blue)', data: mantenimientos },
+              { label:'Completados', value: mantsCompletados.length, accent:'var(--green)', data: mantsCompletados },
             ].map(k => (
-              <div key={k.label} style={{ background:'var(--panel)', border:'1px solid var(--border-soft)', borderRadius:12, padding:'18px 20px', position:'relative', overflow:'hidden' }}>
+              <div key={k.label} 
+                   onClick={() => setDetalleActivo({ tipo: `Filtrado: ${k.label}`, data: k.data })}
+                   style={{ background:'var(--panel)', border:'1px solid var(--border-soft)', borderRadius:12, padding:'18px 20px', position:'relative', overflow:'hidden', cursor: 'pointer', transition: 'transform 0.2s' }}
+                   onMouseOver={e => e.currentTarget.style.transform='translateY(-3px)'} 
+                   onMouseOut={e => e.currentTarget.style.transform='translateY(0)'}>
                 <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background:k.accent, opacity:0.7 }} />
                 <div style={{ fontSize:11, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:8 }}>{k.label}</div>
-                <div style={{ fontSize:28, fontWeight:600, fontFamily:'Space Mono' }}>{k.value}</div>
+                <div style={{ fontSize:28, fontWeight:600, fontFamily:'Space Mono', color: k.label === 'Vencidos' && k.value > 0 ? 'var(--red)' : 'var(--text-1)' }}>{k.value}</div>
               </div>
             ))}
           </div>
 
-          {/* MAGIA 2: Panel con maxWidth: 100% y overflow: hidden */}
           <Panel style={{ maxWidth: '100%', overflow: 'hidden' }}>
             <PanelHeader title="Historial de mantenimientos">
-              {/* MAGIA 3: flexWrap para los filtros */}
               <div style={{ display:'flex', flexWrap: 'wrap', gap:6 }}>
                 {['todos','programado','en_proceso','completado','vencido'].map(e => (
                   <Chip key={e} active={filtro===e} onClick={() => setFiltro(e)}>
@@ -335,12 +369,11 @@ export default function MantenimientoPage() {
             </PanelHeader>
             {loading ? <LoadingSpinner /> : mantenimientos.length === 0 ? <EmptyState message="Sin registros de mantenimiento" /> : (
               
-              /* MAGIA 4: Contenedor scrolleable y minWidth en la tabla */
               <div className="table-responsive-container" style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '8px' }}>
                 <table style={{ width:'100%', borderCollapse:'collapse', minWidth: '1050px' }}>
                   <thead>
                     <tr>
-                      {['Placa/Vehículo','Tipo','Descripción','Fecha','KM','Costo','Estado','Acciones'].map(h => (
+                      {['Placa/Vehículo','Tipo','Descripción','Fecha Programada','Costo','Estado','Acciones'].map(h => (
                         <th key={h} style={{ padding:'10px 20px', textAlign:'left', fontSize:10, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.12em', color:'var(--text-3)', borderBottom:'1px solid var(--border-soft)', background:'var(--panel2)', whiteSpace: 'nowrap' }}>{h}</th>
                       ))}
                     </tr>
@@ -348,9 +381,10 @@ export default function MantenimientoPage() {
                   <tbody>
                     {mantenimientos.map(m => (
                       <tr key={m.id}
+                        onClick={() => setDetalleActivo({ tipo: 'Ficha de Intervención', data: m })}
                         onMouseEnter={e => e.currentTarget.style.background='var(--panel2)'}
                         onMouseLeave={e => e.currentTarget.style.background='transparent'}
-                        style={{ transition:'background 0.15s' }}>
+                        style={{ cursor: 'pointer', transition:'background 0.15s' }}>
                         <td style={{ padding:'13px 20px', borderBottom:'1px solid var(--border-soft)', whiteSpace: 'nowrap' }}>
                           <div style={{ fontFamily:'Space Mono', fontSize:12, color:'var(--gold-light)', fontWeight:700 }}>
                             {m.vehiculo?.placa || m.vehiculo?.codigo || `V-${m.vehiculo_id}`}
@@ -358,15 +392,11 @@ export default function MantenimientoPage() {
                           {m.vehiculo?.marca && <div style={{ fontSize:10, color:'var(--text-3)' }}>{m.vehiculo.marca} {m.vehiculo.modelo}</div>}
                         </td>
                         <td style={{ padding:'13px 20px', borderBottom:'1px solid var(--border-soft)', whiteSpace: 'nowrap' }}><StatusPill status={m.tipo} /></td>
-                        {/* A la descripción le dejamos un ancho máximo para que no sea infinita, pero que corte con '...' */}
                         <td style={{ padding:'13px 20px', fontSize:13, borderBottom:'1px solid var(--border-soft)', maxWidth: '250px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={m.descripcion}>
                           {m.descripcion}
                         </td>
                         <td style={{ padding:'13px 20px', fontSize:11, fontFamily:'Space Mono', color:'var(--text-3)', borderBottom:'1px solid var(--border-soft)', whiteSpace: 'nowrap' }}>
                           {m.fecha_programada ? new Date(m.fecha_programada).toLocaleDateString('es-EC') : '—'}
-                        </td>
-                        <td style={{ padding:'13px 20px', fontSize:12, fontFamily:'Space Mono', color:'var(--text-2)', borderBottom:'1px solid var(--border-soft)', whiteSpace: 'nowrap' }}>
-                          {m.km_programado ? `${m.km_programado.toLocaleString()} km` : '—'}
                         </td>
                         <td style={{ padding:'13px 20px', fontSize:12, fontFamily:'Space Mono', color:'var(--green)', borderBottom:'1px solid var(--border-soft)', whiteSpace: 'nowrap' }}>
                           {m.costo ? `$${m.costo.toFixed(2)}` : '—'}
@@ -375,14 +405,14 @@ export default function MantenimientoPage() {
                         <td style={{ padding:'13px 20px', borderBottom:'1px solid var(--border-soft)', whiteSpace: 'nowrap' }}>
                           <div style={{ display:'flex', gap:8, alignItems:'center' }}>
                             {m.estado !== 'completado' && (
-                              <button onClick={() => completar(m.id)} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(61,200,122,0.1)', color:'var(--green)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }} title="Marcar completado">
+                              <button onClick={(e) => { e.stopPropagation(); completar(m.id); }} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(61,200,122,0.1)', color:'var(--green)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }} title="Marcar completado">
                                 ✓
                               </button>
                             )}
-                            <button onClick={() => cargarDatosEdicion(m)} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(77,156,240,0.1)', color:'var(--blue)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }} title="Editar">
+                            <button onClick={(e) => { e.stopPropagation(); cargarDatosEdicion(m); }} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(77,156,240,0.1)', color:'var(--blue)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }} title="Editar">
                               ✏️
                             </button>
-                            <button onClick={() => eliminarMantenimiento(m.id, m.descripcion)} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(224,82,82,0.1)', color:'var(--red)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }} title="Eliminar">
+                            <button onClick={(e) => { e.stopPropagation(); eliminarMantenimiento(m.id, m.descripcion); }} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(224,82,82,0.1)', color:'var(--red)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }} title="Eliminar">
                               🗑️
                             </button>
                           </div>
@@ -396,6 +426,113 @@ export default function MantenimientoPage() {
           </Panel>
         </>
       )}
+
+      {/* ========================================================= */}
+      {/* EL MODAL INTELIGENTE DE MANTENIMIENTO                     */}
+      {/* ========================================================= */}
+      {detalleActivo && (
+        <div onClick={() => setDetalleActivo(null)} style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(10, 12, 17, 0.85)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, animation: 'fadeInModal 0.2s ease-out', padding: '20px' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: Array.isArray(detalleActivo.data) ? '800px' : '550px', background: 'var(--panel)', borderRadius: 16, padding: '30px', border: '1px solid var(--border-soft)', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', maxHeight: '90vh', overflowY: 'auto' }}>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 15, borderBottom: '1px solid var(--border-soft)' }}>
+              <h2 style={{ margin: 0, color: 'var(--gold-light)', fontSize: 18 }}>{detalleActivo.tipo}</h2>
+              <button onClick={() => setDetalleActivo(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-3)', fontSize: 24, cursor: 'pointer' }}>×</button>
+            </div>
+
+            <div style={{ color: 'var(--text-2)' }}>
+              
+              {/* VISTA 1: Lista filtrada (Array de Mantenimientos) */}
+              {Array.isArray(detalleActivo.data) && (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', minWidth: '600px', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ textAlign: 'left', color: 'var(--text-3)', borderBottom: '1px solid var(--border-soft)' }}>
+                        <th style={{ padding: '10px' }}>Fecha Prog.</th>
+                        <th style={{ padding: '10px' }}>Unidad</th>
+                        <th style={{ padding: '10px' }}>Trabajo</th>
+                        <th style={{ padding: '10px' }}>Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detalleActivo.data.length === 0 ? <tr><td colSpan="4" style={{padding:20, textAlign:'center'}}>No hay registros en esta categoría</td></tr> : null}
+                      {detalleActivo.data.map((m, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid var(--border-soft)' }}>
+                          <td style={{ padding: '12px 10px', fontFamily: 'Space Mono', fontSize: 11, color: m.estado === 'vencido' ? 'var(--red)' : 'var(--text-2)' }}>
+                            {m.fecha_programada ? new Date(m.fecha_programada).toLocaleDateString('es-EC') : 'Sin fecha'}
+                          </td>
+                          <td style={{ padding: '12px 10px' }}>
+                            <div style={{ color: '#fff', fontWeight: 600, fontFamily: 'Space Mono' }}>{m.vehiculo?.placa || m.vehiculo?.codigo}</div>
+                            <div style={{ fontSize: 10, color: 'var(--text-3)' }}>{m.vehiculo?.marca}</div>
+                          </td>
+                          <td style={{ padding: '12px 10px', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={m.descripcion}>
+                            {m.descripcion}
+                          </td>
+                          <td style={{ padding: '12px 10px' }}><StatusPill status={m.estado} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* VISTA 2: Detalle de una sola intervención (Ficha de Mantenimiento) */}
+              {!Array.isArray(detalleActivo.data) && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+                    <div>
+                      <div style={{ fontSize: 24, fontWeight: 'bold', color: '#fff', fontFamily: 'Space Mono' }}>{detalleActivo.data.vehiculo?.placa || detalleActivo.data.vehiculo?.codigo || 'Vehículo'}</div>
+                      <div style={{ fontSize: 14, color: 'var(--gold-light)' }}>{detalleActivo.data.vehiculo?.marca} {detalleActivo.data.vehiculo?.modelo}</div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                      <StatusPill status={detalleActivo.data.estado} />
+                      <StatusPill status={detalleActivo.data.tipo} />
+                    </div>
+                  </div>
+
+                  <div style={{ background: 'var(--panel2)', padding: '18px', borderRadius: 8, border: '1px solid var(--border-soft)', marginBottom: 20 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Procedimiento a realizar</div>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: '#fff', marginTop: 5, lineHeight: 1.4 }}>{detalleActivo.data.descripcion}</div>
+                  </div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 15, marginBottom: 20 }}>
+                    <div style={{ background: 'var(--panel2)', padding: '15px', borderRadius: 8, border: '1px solid var(--border-soft)' }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase' }}>Programado para</div>
+                      <div style={{ fontSize: 15, fontWeight: 600, color: detalleActivo.data.estado === 'vencido' ? 'var(--red)' : '#fff', marginTop: 5, fontFamily: 'Space Mono' }}>
+                        {detalleActivo.data.fecha_programada ? new Date(detalleActivo.data.fecha_programada).toLocaleDateString('es-EC') : 'Por definir'}
+                      </div>
+                    </div>
+                    <div style={{ background: 'var(--panel2)', padding: '15px', borderRadius: 8, border: '1px solid var(--border-soft)' }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase' }}>Kilometraje/Horas Ref.</div>
+                      <div style={{ fontSize: 15, fontWeight: 600, color: '#fff', marginTop: 5, fontFamily: 'Space Mono' }}>
+                        {detalleActivo.data.km_programado ? detalleActivo.data.km_programado.toLocaleString() : 'N/A'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13, color: 'var(--text-2)', padding: '15px', background: 'var(--panel2)', borderRadius: 8 }}>
+                    <div><strong style={{ color: '#fff' }}>Taller Encargado:</strong> <span style={{ float: 'right' }}>{detalleActivo.data.taller || 'Taller Central SOMILOR'}</span></div>
+                    <div><strong style={{ color: '#fff' }}>Inversión Estimada/Real:</strong> <span style={{ float: 'right', fontFamily: 'Space Mono', color: 'var(--green)', fontWeight: 600 }}>{detalleActivo.data.costo ? `$${detalleActivo.data.costo.toFixed(2)}` : 'Pendiente'}</span></div>
+                    
+                    {detalleActivo.data.observaciones && (
+                      <div style={{ marginTop: 5, paddingTop: 10, borderTop: '1px solid var(--border-soft)' }}>
+                        <strong style={{ color: '#fff', display: 'block', marginBottom: 5 }}>Observaciones:</strong> 
+                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: 10, borderRadius: 6, fontStyle: 'italic' }}>
+                          {detalleActivo.data.observaciones}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+            </div>
+          </div>
+        </div>
+      )}
+      
+      <style>{`
+        @keyframes fadeInModal { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+      `}</style>
     </div>
   )
 }

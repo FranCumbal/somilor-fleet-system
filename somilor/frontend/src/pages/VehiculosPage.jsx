@@ -3,7 +3,18 @@ import { vehiculosAPI } from '../services/api'
 import { Panel, PanelHeader, PageHeader, StatusPill, Btn, Chip, LoadingSpinner, EmptyState } from '../components/layout/UI'
 
 const idUnico = () => Math.random().toString(36).substr(2, 9)
-const estadoInicial = { codigo:'', marca:'', modelo:'', anio:'', placa:'', color:'', tipo:'liviano' }
+const estadoInicial = { placa:'', marca:'', modelo:'', anio:'', color:'', tipo:'liviano' }
+
+const preventInvalidChars = (e) => {
+  if (['e', 'E', '+', '-', '.', ','].includes(e.key)) {
+    e.preventDefault()
+  }
+}
+
+const COLORES_AUTOS = [
+  'Blanco', 'Negro', 'Plateado', 'Gris', 'Rojo', 
+  'Azul', 'Verde', 'Amarillo', 'Naranja', 'Beige', 'Otro'
+]
 
 export default function VehiculosPage() {
   const [vehiculos, setVehiculos] = useState([])
@@ -17,7 +28,6 @@ export default function VehiculosPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  // NUEVO ESTADO: Controla el Modal Interactivo
   const [detalleActivo, setDetalleActivo] = useState(null)
 
   const cargar = () => {
@@ -61,11 +71,10 @@ export default function VehiculosPage() {
         })
         await Promise.all(promesas)
       }
-      
       cerrarFormulario()
       cargar()
     } catch (err) {
-      setError('Error al guardar. Revisa que no haya códigos o placas repetidas.')
+      setError('Error al guardar. Revisa que no haya placas repetidas.')
     } finally { setSaving(false) }
   }
 
@@ -73,11 +82,10 @@ export default function VehiculosPage() {
     setEditandoId(v.id)
     setFormularios([{
       idRef: idUnico(),
-      codigo: v.codigo || '',
+      placa: v.placa || '',
       marca: v.marca || '',
       modelo: v.modelo || '',
       anio: v.anio || '',
-      placa: v.placa || '',
       color: v.color || '',
       tipo: v.tipo || 'liviano'
     }])
@@ -92,8 +100,8 @@ export default function VehiculosPage() {
     setError('')
   }
 
-  const eliminarVehiculo = async (id, codigo) => {
-    if (window.confirm(`¿Estás seguro de eliminar el vehículo ${codigo}?`)) {
+  const eliminarVehiculo = async (id, placa) => {
+    if (window.confirm(`¿Estás seguro de eliminar el vehículo con placa ${placa}?`)) {
       try {
         await vehiculosAPI.delete(id)
         cargar()
@@ -129,30 +137,48 @@ export default function VehiculosPage() {
                   </button>
                 )}
               </PanelHeader>
-              <div style={{ padding:20, display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:16 }}>
+              
+              <div style={{ padding:20, display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:16 }}>
                 {[
-                  { key:'codigo', label:'Código *', ph:'VH-001' },
-                  { key:'marca', label:'Marca', ph:'Toyota' },
-                  { key:'modelo', label:'Modelo', ph:'Hilux 4x4' },
-                  { key:'anio', label:'Año', ph:'2022', type:'number' },
-                  { key:'placa', label:'Placa', ph:'PCV-1234' },
-                  { key:'color', label:'Color', ph:'Blanco' },
+                  { key:'placa', label:'Placa del Vehículo *', ph:'Ej: PCV-1234' },
+                  { key:'marca', label:'Marca', ph:'Ej: Toyota' },
+                  { key:'modelo', label:'Modelo', ph:'Ej: Hilux 4x4' },
+                  { key:'anio', label:'Año de Fabricación', ph:'Ej: 2022', type:'number', min: 1950 },
+                  { key:'color', label:'Color del Vehículo', type:'select', options: COLORES_AUTOS },
                 ].map(campo => (
                   <div key={campo.key}>
                     <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>{campo.label}</label>
-                    <input
-                      type={campo.type || 'text'} placeholder={campo.ph} value={f[campo.key]}
-                      onChange={e => updateField(f.idRef, campo.key, e.target.value)}
-                      required={campo.label.includes('*')}
-                      style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none', fontFamily:'DM Sans' }}
-                    />
+                    {campo.type === 'select' ? (
+                      <select 
+                        value={f[campo.key]} 
+                        onChange={e => updateField(f.idRef, campo.key, e.target.value)}
+                        required={campo.label.includes('*')}
+                        style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none', fontFamily:'DM Sans' }}
+                      >
+                        <option value="">Seleccionar color...</option>
+                        {campo.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                    ) : (
+                      <input
+                        type={campo.type || 'text'} 
+                        placeholder={campo.ph} 
+                        value={f[campo.key]}
+                        onChange={e => updateField(f.idRef, campo.key, e.target.value)}
+                        required={campo.label.includes('*')}
+                        onKeyDown={campo.type === 'number' ? preventInvalidChars : undefined}
+                        min={campo.min}
+                        style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none', fontFamily:'DM Sans' }}
+                      />
+                    )}
                   </div>
                 ))}
                 <div>
-                  <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Tipo *</label>
+                  <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Tipo de Unidad *</label>
                   <select value={f.tipo} onChange={e => updateField(f.idRef, 'tipo', e.target.value)}
                     style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none', fontFamily:'DM Sans' }}>
-                    {['liviano','pesado','maquinaria'].map(t => <option key={t} value={t}>{t}</option>)}
+                    <option value="liviano">Liviano</option>
+                    <option value="pesado">Pesado</option>
+                    <option value="maquinaria">Maquinaria / Equipo</option>
                   </select>
                 </div>
               </div>
@@ -233,7 +259,7 @@ export default function VehiculosPage() {
                 <table style={{ width:'100%', borderCollapse:'collapse', minWidth: '950px' }}>
                   <thead>
                     <tr>
-                      {['Placa','Vehículo','Color','Tipo','Año','KM / Horas','Combustible','Estado','Acciones'].map(h => (
+                      {['Placa','Marca / Modelo','Color','Tipo','Año','Uso','Combustible','Estado','Acciones'].map(h => (
                         <th key={h} style={{ padding:'12px 20px', textAlign:'left', fontSize:10, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.12em', color:'var(--text-3)', borderBottom:'1px solid var(--border-soft)', background:'var(--panel2)', whiteSpace:'nowrap' }}>{h}</th>
                       ))}
                     </tr>
@@ -246,11 +272,11 @@ export default function VehiculosPage() {
                           onMouseLeave={e => e.currentTarget.style.background='transparent'} 
                           style={{ cursor:'pointer', transition:'background 0.15s' }}>
                         <td style={{ padding:'14px 20px', borderBottom:'1px solid var(--border-soft)', whiteSpace: 'nowrap' }}>
-                          <span style={{ fontFamily:'Space Mono', fontSize:12, color:'var(--gold-light)', fontWeight:700 }}>{v.placa || 'S/P'}</span>
+                          <span style={{ fontFamily:'Space Mono', fontSize:14, color:'var(--gold-light)', fontWeight:700 }}>{v.placa}</span>
                         </td>
                         <td style={{ padding:'14px 20px', borderBottom:'1px solid var(--border-soft)', whiteSpace: 'nowrap' }}>
-                          <div style={{ fontSize:13, fontWeight:500 }}>{v.marca} {v.modelo}</div>
-                          <div style={{ fontSize:10, color:'var(--text-3)' }}>{v.codigo}</div>
+                          <div style={{ fontSize:13, fontWeight:500 }}>{v.marca || '—'}</div>
+                          <div style={{ fontSize:10, color:'var(--text-3)' }}>{v.modelo || '—'}</div>
                         </td>
                         <td style={{ padding:'14px 20px', fontSize:12, color:'var(--text-2)', borderBottom:'1px solid var(--border-soft)', whiteSpace: 'nowrap' }}>{v.color || '—'}</td>
                         <td style={{ padding:'14px 20px', fontSize:12, color:'var(--text-3)', borderBottom:'1px solid var(--border-soft)', textTransform:'capitalize', whiteSpace: 'nowrap' }}>{v.tipo}</td>
@@ -270,7 +296,7 @@ export default function VehiculosPage() {
                         <td style={{ padding:'14px 20px', borderBottom:'1px solid var(--border-soft)', whiteSpace: 'nowrap' }}>
                           <div style={{ display:'flex', gap:8 }}>
                             <button onClick={(e) => { e.stopPropagation(); cargarDatosEdicion(v); }} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(77,156,240,0.1)', color:'var(--blue)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }} title="Editar">✏️</button>
-                            <button onClick={(e) => { e.stopPropagation(); eliminarVehiculo(v.id, v.codigo); }} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(224,82,82,0.1)', color:'var(--red)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }} title="Eliminar">🗑️</button>
+                            <button onClick={(e) => { e.stopPropagation(); eliminarVehiculo(v.id, v.placa); }} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(224,82,82,0.1)', color:'var(--red)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }} title="Eliminar">🗑️</button>
                           </div>
                         </td>
                       </tr>
@@ -284,7 +310,7 @@ export default function VehiculosPage() {
       )}
 
       {/* ========================================================= */}
-      {/*                  EL MODAL INTELIGENTE                     */}
+      {/* EL MODAL INTELIGENTE                     */}
       {/* ========================================================= */}
       {detalleActivo && (
         <div onClick={() => setDetalleActivo(null)} style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(10, 12, 17, 0.85)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, animation: 'fadeInModal 0.2s ease-out', padding: '20px' }}>
@@ -313,7 +339,7 @@ export default function VehiculosPage() {
                       {detalleActivo.data.map((v, i) => (
                         <tr key={i} style={{ borderBottom: '1px solid var(--border-soft)' }}>
                           <td style={{ padding: '12px 10px' }}>
-                            <div style={{ color: '#fff', fontWeight: 600, fontFamily: 'Space Mono' }}>{v.placa || v.codigo}</div>
+                            <div style={{ color: '#fff', fontWeight: 600, fontFamily: 'Space Mono' }}>{v.placa}</div>
                             <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{v.marca} {v.modelo}</div>
                           </td>
                           <td style={{ padding: '12px 10px', textTransform: 'capitalize' }}>{v.tipo}</td>
@@ -330,9 +356,8 @@ export default function VehiculosPage() {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
                     <div>
-                      <div style={{ fontSize: 24, fontWeight: 'bold', color: '#fff', fontFamily: 'Space Mono' }}>{detalleActivo.data.placa || 'SIN PLACA'}</div>
+                      <div style={{ fontSize: 24, fontWeight: 'bold', color: '#fff', fontFamily: 'Space Mono' }}>{detalleActivo.data.placa}</div>
                       <div style={{ fontSize: 14, color: 'var(--gold-light)' }}>{detalleActivo.data.marca} {detalleActivo.data.modelo} ({detalleActivo.data.anio || 'N/A'})</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>Cód: {detalleActivo.data.codigo}</div>
                     </div>
                     <StatusPill status={detalleActivo.data.estado} />
                   </div>
@@ -356,8 +381,8 @@ export default function VehiculosPage() {
                   </div>
 
                   <div style={{ display: 'flex', gap: 15, fontSize: 13, color: 'var(--text-2)', padding: '15px', background: 'var(--panel2)', borderRadius: 8 }}>
-                    <div><strong>Tipo:</strong> <span style={{ textTransform: 'capitalize' }}>{detalleActivo.data.tipo}</span></div>
-                    <div><strong>Color:</strong> {detalleActivo.data.color || 'No especificado'}</div>
+                    <div><strong style={{ color: '#fff' }}>Tipo:</strong> <span style={{ textTransform: 'capitalize' }}>{detalleActivo.data.tipo}</span></div>
+                    <div><strong style={{ color: '#fff' }}>Color:</strong> {detalleActivo.data.color || 'No especificado'}</div>
                   </div>
                 </div>
               )}

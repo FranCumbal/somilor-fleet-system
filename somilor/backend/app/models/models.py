@@ -56,11 +56,10 @@ class Chofer(Base):
 class Vehiculo(Base):
     __tablename__ = "vehiculos"
     id = Column(Integer, primary_key=True, index=True)
-    codigo = Column(String(20), unique=True, index=True, nullable=False)  # VH-001
+    placa = Column(String(20), unique=True, index=True, nullable=False) # AHORA ES LA REINA
     marca = Column(String(80))
     modelo = Column(String(80))
     anio = Column(Integer)
-    placa = Column(String(20), unique=True)
     color = Column(String(50))
     tipo = Column(Enum(TipoVehiculo), nullable=False)
     estado = Column(Enum(EstadoVehiculo), default=EstadoVehiculo.libre)
@@ -97,15 +96,7 @@ class Tanqueo(Base):
     vehiculo_id = Column(Integer, ForeignKey("vehiculos.id"), nullable=False)
     chofer_id = Column(Integer, ForeignKey("choferes.id"), nullable=True)
     fecha = Column(DateTime(timezone=True), server_default=func.now())
-    litros = Column(Float, nullable=False)
-    km_inicial = Column(Float)
-    km_final = Column(Float)
-    horas_inicial = Column(Float)  # para maquinaria
-    horas_final = Column(Float)
-    rendimiento_km_l = Column(Float)  # calculado
-    costo_total = Column(Float)
-    precio_litro = Column(Float)
-    es_anomalia = Column(Boolean, default=False)
+    costo_total = Column(Float, nullable=False) # Ahora este es el protagonista
     observaciones = Column(Text)
 
     vehiculo = relationship("Vehiculo", back_populates="tanqueos")

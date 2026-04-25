@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { checklistAPI, vehiculosAPI, choferesAPI } from '../services/api'
-import { Panel, PanelHeader, PageHeader, Btn, LoadingSpinner, EmptyState } from '../components/layout/UI'
+import { Panel, PanelHeader, PageHeader, Btn, LoadingSpinner, EmptyState, StatusPill } from '../components/layout/UI'
 
 const ITEMS = [
   { key:'luces_delanteras',   label:'Luces delanteras',        icon:'🔦' },
@@ -37,10 +37,13 @@ export default function ChecklistPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
+  // ESTADO PARA EL MODAL INTERACTIVO
+  const [detalleActivo, setDetalleActivo] = useState(null)
+
   const cargar = () => {
     setLoading(true)
     Promise.all([
-      checklistAPI.list({ limit:15 }),
+      checklistAPI.list({ limit: 100 }), 
       vehiculosAPI.list(),
       choferesAPI.list(),
       checklistAPI.resumenHoy(),
@@ -138,9 +141,12 @@ export default function ChecklistPage() {
     }
   }
 
+  // Preparar datos filtrados para el modal de KPIs
+  const hoyStr = new Date().toLocaleDateString('es-EC')
+  const checklistsHoy = checklists.filter(c => new Date(c.fecha).toLocaleDateString('es-EC') === hoyStr)
+
   return (
-    // MAGIA 1: minWidth: 0, width: 100%
-    <div style={{ display:'flex', flexDirection:'column', gap:20, minWidth: 0, width: '100%' }}>
+    <div style={{ display:'flex', flexDirection:'column', gap:20, minWidth: 0, width: '100%', position: 'relative' }}>
       <PageHeader title="Checklist Pre-operacional" subtitle="Validación de salida de vehículos">
         <Btn variant={showForm ? "ghost" : "primary"} onClick={() => { cerrarFormulario(); setShowForm(!showForm); }}>
           {showForm ? 'Volver al panel' : '+ Nueva inspección'}
@@ -183,7 +189,7 @@ export default function ChecklistPage() {
                     <select value={f.vehiculo_id} onChange={e => updateField(f.idRef, 'vehiculo_id', e.target.value)} required disabled={f.tipo_vehiculo && vehiculosFiltrados.length === 0}
                       style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none', opacity: (f.tipo_vehiculo && vehiculosFiltrados.length === 0) ? 0.5 : 1 }}>
                       <option value="">Seleccionar...</option>
-                      {vehiculosFiltrados.map(v => <option key={v.id} value={v.id}>{v.placa || v.codigo} — {v.marca} {v.modelo} ({v.color || 'S/C'})</option>)}
+                      {vehiculosFiltrados.map(v => <option key={v.id} value={v.id}>{v.placa || v.codigo} — {v.marca} {v.modelo}</option>)}
                     </select>
                   </div>
                   <div>
@@ -268,25 +274,26 @@ export default function ChecklistPage() {
           {resumen && (
             <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14 }}>
               {[
-                { label:'Total hoy', value:resumen.total, accent:'var(--blue)' },
-                { label:'Aprobados', value:resumen.aprobados, accent:'var(--green)' },
-                { label:'Reprobados', value:resumen.reprobados, accent:'var(--red)' },
+                { label:'Inspecciones Hoy', value:resumen.total, accent:'var(--blue)', data: checklistsHoy },
+                { label:'Aprobados', value:resumen.aprobados, accent:'var(--green)', data: checklistsHoy.filter(c => c.aprobado === true) },
+                { label:'Reprobados / Taller', value:resumen.reprobados, accent:'var(--red)', data: checklistsHoy.filter(c => c.aprobado === false) },
               ].map(k => (
-                <div key={k.label} style={{ background:'var(--panel)', border:'1px solid var(--border-soft)', borderRadius:12, padding:'18px 20px', position:'relative', overflow:'hidden' }}>
+                <div key={k.label} 
+                     onClick={() => setDetalleActivo({ tipo: k.label, data: k.data })}
+                     style={{ background:'var(--panel)', border:'1px solid var(--border-soft)', borderRadius:12, padding:'18px 20px', position:'relative', overflow:'hidden', cursor: 'pointer', transition: 'transform 0.2s' }}
+                     onMouseOver={e => e.currentTarget.style.transform='translateY(-3px)'} 
+                     onMouseOut={e => e.currentTarget.style.transform='translateY(0)'}>
                   <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background:k.accent, opacity:0.7 }} />
                   <div style={{ fontSize:11, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:8 }}>{k.label}</div>
-                  <div style={{ fontSize:28, fontWeight:600, fontFamily:'Space Mono' }}>{k.value}</div>
+                  <div style={{ fontSize:28, fontWeight:600, fontFamily:'Space Mono', color: k.label === 'Reprobados / Taller' && k.value > 0 ? 'var(--red)' : 'var(--text-1)' }}>{k.value}</div>
                 </div>
               ))}
             </div>
           )}
 
-          {/* MAGIA 2: maxWidth: 100%, overflow: hidden en Paneles */}
           <Panel style={{ maxWidth: '100%', overflow: 'hidden' }}>
             <PanelHeader title="Historial de checklists recientes" />
             {loading ? <LoadingSpinner /> : checklists.length === 0 ? <EmptyState message="Sin checklists registrados" /> : (
-              
-              /* MAGIA 3: Contenedor scrolleable, minWidth y whiteSpace nowrap */
               <div className="table-responsive-container" style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '8px' }}>
                 <table style={{ width:'100%', borderCollapse:'collapse', minWidth: '900px' }}>
                   <thead>
@@ -298,7 +305,11 @@ export default function ChecklistPage() {
                   </thead>
                   <tbody>
                     {checklists.map(c => (
-                      <tr key={c.id} onMouseEnter={e => e.currentTarget.style.background='var(--panel2)'} onMouseLeave={e => e.currentTarget.style.background='transparent'} style={{ transition:'background 0.15s' }}>
+                      <tr key={c.id} 
+                        onClick={() => setDetalleActivo({ tipo: 'Hoja de Inspección Técnica', data: c })}
+                        onMouseEnter={e => e.currentTarget.style.background='var(--panel2)'} 
+                        onMouseLeave={e => e.currentTarget.style.background='transparent'} 
+                        style={{ cursor: 'pointer', transition:'background 0.15s' }}>
                         <td style={{ padding:'13px 20px', fontSize:11, fontFamily:'Space Mono', color:'var(--text-3)', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>
                           {new Date(c.fecha).toLocaleString('es-EC', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })}
                         </td>
@@ -325,8 +336,8 @@ export default function ChecklistPage() {
                         </td>
                         <td style={{ padding:'13px 20px', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>
                           <div style={{ display:'flex', gap:8 }}>
-                            <button onClick={() => cargarDatosEdicion(c)} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(77,156,240,0.1)', color:'var(--blue)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }} title="Editar">✏️</button>
-                            <button onClick={() => eliminarChecklist(c.id)} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(224,82,82,0.1)', color:'var(--red)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }} title="Eliminar">🗑️</button>
+                            <button onClick={(e) => { e.stopPropagation(); cargarDatosEdicion(c); }} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(77,156,240,0.1)', color:'var(--blue)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }} title="Editar">✏️</button>
+                            <button onClick={(e) => { e.stopPropagation(); eliminarChecklist(c.id); }} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(224,82,82,0.1)', color:'var(--red)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }} title="Eliminar">🗑️</button>
                           </div>
                         </td>
                       </tr>
@@ -338,6 +349,110 @@ export default function ChecklistPage() {
           </Panel>
         </>
       )}
+
+      {/* ========================================================= */}
+      {/* EL MODAL INTELIGENTE DE CHECKLISTS                        */}
+      {/* ========================================================= */}
+      {detalleActivo && (
+        <div onClick={() => setDetalleActivo(null)} style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(10, 12, 17, 0.85)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, animation: 'fadeInModal 0.2s ease-out', padding: '20px' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: Array.isArray(detalleActivo.data) ? '650px' : '550px', background: 'var(--panel)', borderRadius: 16, padding: '30px', border: '1px solid var(--border-soft)', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', maxHeight: '90vh', overflowY: 'auto' }}>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 15, borderBottom: '1px solid var(--border-soft)' }}>
+              <h2 style={{ margin: 0, color: 'var(--gold-light)', fontSize: 18 }}>{detalleActivo.tipo}</h2>
+              <button onClick={() => setDetalleActivo(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-3)', fontSize: 24, cursor: 'pointer' }}>×</button>
+            </div>
+
+            <div style={{ color: 'var(--text-2)' }}>
+              
+              {/* VISTA 1: Lista filtrada desde los KPIs (Array) */}
+              {Array.isArray(detalleActivo.data) && (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', minWidth: '500px', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ textAlign: 'left', color: 'var(--text-3)', borderBottom: '1px solid var(--border-soft)' }}>
+                        <th style={{ padding: '10px' }}>Hora</th>
+                        <th style={{ padding: '10px' }}>Unidad</th>
+                        <th style={{ padding: '10px' }}>Chofer</th>
+                        <th style={{ padding: '10px' }}>Resultado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detalleActivo.data.length === 0 ? <tr><td colSpan="4" style={{padding:20, textAlign:'center'}}>No hay inspecciones en esta categoría hoy</td></tr> : null}
+                      {detalleActivo.data.map((c, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid var(--border-soft)' }}>
+                          <td style={{ padding: '12px 10px', fontFamily: 'Space Mono', fontSize: 11 }}>
+                            {new Date(c.fecha).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })}
+                          </td>
+                          <td style={{ padding: '12px 10px' }}>
+                            <div style={{ color: '#fff', fontWeight: 600, fontFamily: 'Space Mono' }}>{c.vehiculo?.placa || c.vehiculo?.codigo}</div>
+                          </td>
+                          <td style={{ padding: '12px 10px' }}>{c.chofer ? `${c.chofer.nombre}` : '—'}</td>
+                          <td style={{ padding: '12px 10px' }}>
+                             <StatusPill status={c.aprobado ? 'aprobado' : 'reprobado'} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* VISTA 2: Detalle de una sola inspección (El Checklist Completo) */}
+              {!Array.isArray(detalleActivo.data) && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+                    <div>
+                      <div style={{ fontSize: 24, fontWeight: 'bold', color: '#fff', fontFamily: 'Space Mono' }}>{detalleActivo.data.vehiculo?.placa || detalleActivo.data.vehiculo?.codigo || 'Vehículo'}</div>
+                      <div style={{ fontSize: 14, color: 'var(--gold-light)' }}>{detalleActivo.data.vehiculo?.marca} {detalleActivo.data.vehiculo?.modelo}</div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                      <StatusPill status={detalleActivo.data.aprobado ? 'aprobado' : 'reprobado'} />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 20, fontSize: 13, color: 'var(--text-3)', marginBottom: 20, paddingBottom: 15, borderBottom: '1px solid var(--border-soft)' }}>
+                    <div><strong style={{ color: 'var(--text-2)' }}>Fecha:</strong> {new Date(detalleActivo.data.fecha).toLocaleString('es-EC')}</div>
+                    <div><strong style={{ color: 'var(--text-2)' }}>Turno:</strong> <span style={{ textTransform: 'capitalize' }}>{detalleActivo.data.turno}</span></div>
+                    <div><strong style={{ color: 'var(--text-2)' }}>Chofer:</strong> {detalleActivo.data.chofer ? `${detalleActivo.data.chofer.nombre} ${detalleActivo.data.chofer.apellido}` : '—'}</div>
+                  </div>
+                  
+                  {/* GRILLA DE ITEMS DE INSPECCIÓN */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, marginBottom: 20 }}>
+                    {ITEMS.map(item => {
+                       const isOk = detalleActivo.data[item.key]
+                       return (
+                         <div key={item.key} style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--panel2)', padding: '10px 15px', borderRadius: 8, border: '1px solid var(--border-soft)' }}>
+                            <span style={{ fontSize: 18 }}>{item.icon}</span>
+                            <span style={{ flex: 1, fontSize: 13, color: 'var(--text-1)' }}>{item.label}</span>
+                            {isOk === null ? (
+                               <span style={{ color: 'var(--amber)', fontWeight: 'bold', fontSize: 12 }}>—</span>
+                            ) : isOk ? (
+                               <span style={{ color: 'var(--green)', fontWeight: 'bold', fontSize: 16 }}>✓</span>
+                            ) : (
+                               <span style={{ color: 'var(--red)', fontWeight: 'bold', fontSize: 16 }}>✗</span>
+                            )}
+                         </div>
+                       )
+                    })}
+                  </div>
+
+                  <div style={{ padding: '15px', background: 'var(--panel2)', borderRadius: 8, fontSize: 13, color: 'var(--text-2)' }}>
+                    <strong style={{ color: '#fff', display: 'block', marginBottom: 5 }}>Observaciones registradas:</strong> 
+                    <div style={{ fontStyle: 'italic' }}>
+                      {detalleActivo.data.observaciones || 'No se registraron novedades adicionales durante la inspección.'}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+            </div>
+          </div>
+        </div>
+      )}
+      
+      <style>{`
+        @keyframes fadeInModal { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+      `}</style>
     </div>
   )
 }

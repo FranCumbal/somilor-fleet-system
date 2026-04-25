@@ -47,15 +47,15 @@ class ChoferOut(ChoferBase):
 
 # ── VEHICULO ──────────────────────────────────
 class VehiculoBase(BaseModel):
-    codigo: str
+    placa: str 
     marca: Optional[str] = None
     modelo: Optional[str] = None
     anio: Optional[int] = None
-    placa: Optional[str] = None
     color: Optional[str] = None
     tipo: TipoVehiculo
     kilometraje_actual: float = 0
     horas_operacion: float = 0
+    nivel_combustible: float = 100
     nivel_combustible: float = 100
 
 class VehiculoCreate(VehiculoBase): pass
@@ -93,32 +93,24 @@ class AsignacionOut(BaseModel):
 
 
 # ── TANQUEO ───────────────────────────────────
+
 class TanqueoCreate(BaseModel):
     vehiculo_id: int
     chofer_id: Optional[int] = None
-    litros: float
-    km_inicial: Optional[float] = None
-    km_final: Optional[float] = None
-    horas_inicial: Optional[float] = None
-    horas_final: Optional[float] = None
-    costo_total: Optional[float] = None
-    precio_litro: Optional[float] = None
+    costo_total: float
+    fecha: Optional[datetime] = None  
     observaciones: Optional[str] = None
 
 class TanqueoUpdate(BaseModel):
-    litros: Optional[float] = None
-    km_inicial: Optional[float] = None
-    km_final: Optional[float] = None
-    horas_inicial: Optional[float] = None
-    horas_final: Optional[float] = None
-    precio_litro: Optional[float] = None
+    vehiculo_id: Optional[int] = None
+    chofer_id: Optional[int] = None
+    costo_total: Optional[float] = None
+    fecha: Optional[datetime] = None  
     observaciones: Optional[str] = None
 
 class TanqueoOut(TanqueoCreate):
     id: int
     fecha: datetime
-    rendimiento_km_l: Optional[float]
-    es_anomalia: bool
     class Config: from_attributes = True
 
 class CatalogoMantenimientoOut(BaseModel):
@@ -171,19 +163,20 @@ class MantenimientoOut(MantenimientoCreate):
 class ChecklistCreate(BaseModel):
     vehiculo_id: int
     chofer_id: int
-    turno: str = "dia"
-    luces_delanteras: bool
-    luces_traseras: bool
-    llantas: bool
-    extintor: bool
-    nivel_agua: bool
-    nivel_aceite: bool
-    bateria: bool
-    limpiabrisas: bool
-    bocina: bool
-    espejos: bool
-    cinturones: bool
-    senales_emergencia: bool
+    turno: str = "dia"    
+    luces_delanteras: Optional[bool] = None
+    luces_traseras: Optional[bool] = None
+    llantas: Optional[bool] = None
+    extintor: Optional[bool] = None
+    nivel_agua: Optional[bool] = None
+    nivel_aceite: Optional[bool] = None
+    bateria: Optional[bool] = None
+    limpiabrisas: Optional[bool] = None
+    bocina: Optional[bool] = None
+    espejos: Optional[bool] = None
+    cinturones: Optional[bool] = None
+    senales_emergencia: Optional[bool] = None
+    
     observaciones: Optional[str] = None
 
 class ChecklistUpdate(BaseModel):
