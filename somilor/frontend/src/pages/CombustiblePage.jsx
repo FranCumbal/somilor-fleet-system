@@ -22,7 +22,6 @@ export default function CombustiblePage() {
   const [editandoId, setEditandoId] = useState(null)
   
   const [formularios, setFormularios] = useState([{ idRef: idUnico(), ...estadoInicial }])
-  
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -44,13 +43,8 @@ export default function CombustiblePage() {
     setFormularios(prev => prev.map(f => f.idRef === idRef ? { ...f, [field]: value } : f))
   }
 
-  const agregarFormulario = () => {
-    setFormularios(prev => [...prev, { idRef: idUnico(), ...estadoInicial }])
-  }
-
-  const removerFormulario = (idRef) => {
-    setFormularios(prev => prev.filter(f => f.idRef !== idRef))
-  }
+  const agregarFormulario = () => setFormularios(prev => [...prev, { idRef: idUnico(), ...estadoInicial }])
+  const removerFormulario = (idRef) => setFormularios(prev => prev.filter(f => f.idRef !== idRef))
 
   const handleSubmit = async (e) => {
     e.preventDefault(); setSaving(true); setError('')
@@ -68,7 +62,7 @@ export default function CombustiblePage() {
         await combustibleAPI.update(editandoId, payload)
       } else {
         const promesas = formularios.map(f => {
-          const payload = {
+          return combustibleAPI.create({
             vehiculo_id: parseInt(f.vehiculo_id),
             chofer_id: f.chofer_id ? parseInt(f.chofer_id) : null,
             litros: parseFloat(f.litros),
@@ -76,8 +70,7 @@ export default function CombustiblePage() {
             km_final: f.km_final ? parseFloat(f.km_final) : null,
             precio_litro: f.precio_litro ? parseFloat(f.precio_litro) : null,
             observaciones: f.observaciones || null,
-          }
-          return combustibleAPI.create(payload)
+          })
         })
         await Promise.all(promesas)
       }
@@ -104,20 +97,12 @@ export default function CombustiblePage() {
   }
 
   const cerrarFormulario = () => {
-    setShowForm(false)
-    setEditandoId(null)
-    setFormularios([{ idRef: idUnico(), ...estadoInicial }])
-    setError('')
+    setShowForm(false); setEditandoId(null); setFormularios([{ idRef: idUnico(), ...estadoInicial }]); setError('')
   }
 
   const eliminarTanqueo = async (id) => {
     if (window.confirm(`¿Estás seguro de eliminar este registro de tanqueo?`)) {
-      try {
-        await combustibleAPI.delete(id)
-        cargar()
-      } catch (err) {
-        alert('Error al eliminar el registro')
-      }
+      try { await combustibleAPI.delete(id); cargar() } catch (err) { alert('Error al eliminar') }
     }
   }
 
@@ -126,7 +111,8 @@ export default function CombustiblePage() {
   const rendProm = tanqueos.filter(t => t.rendimiento_km_l).reduce((s, t, _, a) => s + t.rendimiento_km_l / a.length, 0)
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+    // MAGIA 1: minWidth: 0, width: 100%
+    <div style={{ display:'flex', flexDirection:'column', gap:20, minWidth: 0, width: '100%' }}>
       <PageHeader title="Gestión de Combustible" subtitle="Control de tanqueos y rendimiento">
         <Btn variant={showForm ? "ghost" : "primary"} onClick={() => { cerrarFormulario(); setShowForm(!showForm); }}>
           {showForm ? 'Volver al panel' : '+ Registrar tanqueo'}
@@ -150,7 +136,7 @@ export default function CombustiblePage() {
                   <select value={f.vehiculo_id} onChange={e => updateField(f.idRef, 'vehiculo_id', e.target.value)} required
                     style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none' }}>
                     <option value="">Seleccionar...</option>
-                    {vehiculos.map(v => <option key={v.id} value={v.id}>{v.placa || v.codigo} — {v.marca} {v.modelo} ({v.color || 'S/C'})</option>)}
+                    {vehiculos.map(v => <option key={v.id} value={v.id}>{v.placa || v.codigo} — {v.marca} {v.modelo}</option>)}
                   </select>
                 </div>
                 <div>
@@ -217,7 +203,8 @@ export default function CombustiblePage() {
             ))}
           </div>
 
-          <Panel>
+          {/* MAGIA 2: maxWidth: 100%, overflow: hidden en Paneles */}
+          <Panel style={{ maxWidth: '100%', overflow: 'hidden' }}>
             <PanelHeader title="Consumo diario — mes actual (litros)" />
             <div style={{ padding:'20px 20px 10px' }}>
               <ResponsiveContainer width="100%" height={180}>
@@ -233,56 +220,60 @@ export default function CombustiblePage() {
             </div>
           </Panel>
 
-          <Panel>
+          <Panel style={{ maxWidth: '100%', overflow: 'hidden' }}>
             <PanelHeader title="Últimos tanqueos registrados" />
             {loading ? <LoadingSpinner /> : tanqueos.length === 0 ? <EmptyState message="Sin registros de combustible" /> : (
-              <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                <thead>
-                  <tr>
-                    {['Fecha','Placa/Vehículo','Chofer','Litros','KM inicial','KM final','Rendimiento','Estado','Acciones'].map(h => (
-                      <th key={h} style={{ padding:'10px 20px', textAlign:'left', fontSize:10, fontWeight:500, textTransform:'uppercase', letterSpacing:'0.12em', color:'var(--text-3)', borderBottom:'1px solid var(--border-soft)', background:'var(--panel2)' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {tanqueos.map(t => (
-                    <tr key={t.id} onMouseEnter={e => e.currentTarget.style.background='var(--panel2)'} onMouseLeave={e => e.currentTarget.style.background='transparent'} style={{ transition:'background 0.15s' }}>
-                      <td style={{ padding:'13px 20px', fontSize:11, fontFamily:'Space Mono', color:'var(--text-3)', borderBottom:'1px solid var(--border-soft)' }}>
-                        {new Date(t.fecha).toLocaleString('es-EC', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })}
-                      </td>
-                      <td style={{ padding:'13px 20px', borderBottom:'1px solid var(--border-soft)' }}>
-                        <div style={{ fontFamily:'Space Mono', fontSize:12, color:'var(--gold-light)', fontWeight:700 }}>
-                          {t.vehiculo?.placa || t.vehiculo?.codigo || `V-${t.vehiculo_id}`}
-                        </div>
-                        {t.vehiculo?.marca && <div style={{ fontSize:10, color:'var(--text-3)' }}>{t.vehiculo.marca} {t.vehiculo.modelo}</div>}
-                      </td>
-                      <td style={{ padding:'13px 20px', fontSize:13, color:'var(--text-2)', borderBottom:'1px solid var(--border-soft)' }}>
-                        {t.chofer ? `${t.chofer.nombre} ${t.chofer.apellido}` : '—'}
-                      </td>
-                      <td style={{ padding:'13px 20px', fontSize:13, fontFamily:'Space Mono', borderBottom:'1px solid var(--border-soft)' }}>{t.litros} L</td>
-                      <td style={{ padding:'13px 20px', fontSize:12, fontFamily:'Space Mono', color:'var(--text-2)', borderBottom:'1px solid var(--border-soft)' }}>{t.km_inicial?.toLocaleString() ?? '—'}</td>
-                      <td style={{ padding:'13px 20px', fontSize:12, fontFamily:'Space Mono', color:'var(--text-2)', borderBottom:'1px solid var(--border-soft)' }}>{t.km_final?.toLocaleString() ?? '—'}</td>
-                      <td style={{ padding:'13px 20px', borderBottom:'1px solid var(--border-soft)' }}>
-                        {t.rendimiento_km_l ? (
-                          <span style={{ fontFamily:'Space Mono', fontSize:12, color: t.rendimiento_km_l < 4 ? 'var(--red)' : 'var(--green)' }}>{t.rendimiento_km_l} km/L</span>
-                        ) : <span style={{ color:'var(--text-3)', fontSize:12 }}>—</span>}
-                      </td>
-                      <td style={{ padding:'13px 20px', borderBottom:'1px solid var(--border-soft)' }}>
-                        {t.es_anomalia
-                          ? <span style={{ fontSize:11, color:'var(--red)', background:'rgba(224,82,82,0.1)', padding:'3px 8px', borderRadius:8, fontWeight:600 }}>⚠ Anomalía</span>
-                          : <span style={{ fontSize:11, color:'var(--green)' }}>Normal</span>
-                        }
-                      </td>
-                      <td style={{ padding:'13px 20px', borderBottom:'1px solid var(--border-soft)' }}>
-                        <div style={{ display:'flex', gap:8 }}>
-                          <button onClick={() => cargarDatosEdicion(t)} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(77,156,240,0.1)', color:'var(--blue)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }} title="Editar">✏️</button>
-                          <button onClick={() => eliminarTanqueo(t.id)} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(224,82,82,0.1)', color:'var(--red)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }} title="Eliminar">🗑️</button>
-                        </div>
-                      </td>
+              
+              /* MAGIA 3: Contenedor scrolleable, minWidth y whiteSpace nowrap */
+              <div className="table-responsive-container" style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '8px' }}>
+                <table style={{ width:'100%', borderCollapse:'collapse', minWidth: '950px' }}>
+                  <thead>
+                    <tr>
+                      {['Fecha','Placa/Vehículo','Chofer','Litros','KM inicial','KM final','Rendimiento','Estado','Acciones'].map(h => (
+                        <th key={h} style={{ padding:'10px 20px', textAlign:'left', fontSize:10, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.12em', color:'var(--text-3)', borderBottom:'1px solid var(--border-soft)', background:'var(--panel2)', whiteSpace:'nowrap' }}>{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {tanqueos.map(t => (
+                      <tr key={t.id} onMouseEnter={e => e.currentTarget.style.background='var(--panel2)'} onMouseLeave={e => e.currentTarget.style.background='transparent'} style={{ transition:'background 0.15s' }}>
+                        <td style={{ padding:'13px 20px', fontSize:11, fontFamily:'Space Mono', color:'var(--text-3)', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>
+                          {new Date(t.fecha).toLocaleString('es-EC', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })}
+                        </td>
+                        <td style={{ padding:'13px 20px', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>
+                          <div style={{ fontFamily:'Space Mono', fontSize:12, color:'var(--gold-light)', fontWeight:700 }}>
+                            {t.vehiculo?.placa || t.vehiculo?.codigo || `V-${t.vehiculo_id}`}
+                          </div>
+                          {t.vehiculo?.marca && <div style={{ fontSize:10, color:'var(--text-3)' }}>{t.vehiculo.marca} {t.vehiculo.modelo}</div>}
+                        </td>
+                        <td style={{ padding:'13px 20px', fontSize:13, color:'var(--text-2)', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>
+                          {t.chofer ? `${t.chofer.nombre} ${t.chofer.apellido}` : '—'}
+                        </td>
+                        <td style={{ padding:'13px 20px', fontSize:13, fontFamily:'Space Mono', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>{t.litros} L</td>
+                        <td style={{ padding:'13px 20px', fontSize:12, fontFamily:'Space Mono', color:'var(--text-2)', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>{t.km_inicial?.toLocaleString() ?? '—'}</td>
+                        <td style={{ padding:'13px 20px', fontSize:12, fontFamily:'Space Mono', color:'var(--text-2)', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>{t.km_final?.toLocaleString() ?? '—'}</td>
+                        <td style={{ padding:'13px 20px', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>
+                          {t.rendimiento_km_l ? (
+                            <span style={{ fontFamily:'Space Mono', fontSize:12, color: t.rendimiento_km_l < 4 ? 'var(--red)' : 'var(--green)' }}>{t.rendimiento_km_l} km/L</span>
+                          ) : <span style={{ color:'var(--text-3)', fontSize:12 }}>—</span>}
+                        </td>
+                        <td style={{ padding:'13px 20px', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>
+                          {t.es_anomalia
+                            ? <span style={{ fontSize:11, color:'var(--red)', background:'rgba(224,82,82,0.1)', padding:'3px 8px', borderRadius:8, fontWeight:600 }}>⚠ Anomalía</span>
+                            : <span style={{ fontSize:11, color:'var(--green)' }}>Normal</span>
+                          }
+                        </td>
+                        <td style={{ padding:'13px 20px', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>
+                          <div style={{ display:'flex', gap:8 }}>
+                            <button onClick={() => cargarDatosEdicion(t)} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(77,156,240,0.1)', color:'var(--blue)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }} title="Editar">✏️</button>
+                            <button onClick={() => eliminarTanqueo(t.id)} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(224,82,82,0.1)', color:'var(--red)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }} title="Eliminar">🗑️</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </Panel>
         </>

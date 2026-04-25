@@ -8,8 +8,8 @@ import logo from '../assets/SomilorLogo.png'
 export default function LoginPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
-  const [email, setEmail] = useState('admin@somilor.com')
-  const [password, setPassword] = useState('Admin123!')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -112,7 +112,7 @@ export default function LoginPage() {
         </form>
 
         <div style={{ marginTop:24, padding:'14px', background:'var(--panel2)', borderRadius:8, fontSize:12, color:'var(--text-3)', fontFamily:'Space Mono', textAlign: 'center' }}>
-          Demo: admin@somilor.com / Admin123!
+          Demo: admin@somilor.com / admin123
         </div>
       </div>
     </div>

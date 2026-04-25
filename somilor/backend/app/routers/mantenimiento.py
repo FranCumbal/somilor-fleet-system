@@ -4,8 +4,8 @@ from sqlalchemy import func
 from typing import List, Optional
 from datetime import datetime, timedelta
 from app.database import get_db
-from app.models import Mantenimiento, EstadoMantenimiento, Vehiculo
-from app.schemas import MantenimientoCreate, MantenimientoOut, MantenimientoUpdate
+from app.models import Mantenimiento, EstadoMantenimiento, Vehiculo, CatalogoMantenimiento
+from app.schemas import MantenimientoCreate, MantenimientoOut, MantenimientoUpdate, CatalogoMantenimientoOut
 
 router = APIRouter(prefix="/mantenimiento", tags=["Mantenimiento"])
 
@@ -50,6 +50,13 @@ def alertas_mantenimiento(db: Session = Depends(get_db)):
         "detalle_proximos": [{"id": m.id, "vehiculo_id": m.vehiculo_id, "descripcion": m.descripcion, "fecha": m.fecha_programada} for m in proximos],
     }
 
+@router.get("/catalogo", response_model=List[CatalogoMantenimientoOut])
+def listar_catalogo(tipo_vehiculo: Optional[str] = None, db: Session = Depends(get_db)):
+    """Obtiene la lista estandarizada de procedimientos desde la base de datos"""
+    q = db.query(CatalogoMantenimiento)
+    if tipo_vehiculo:
+        q = q.filter(CatalogoMantenimiento.tipo_vehiculo == tipo_vehiculo)
+    return q.all()
 
 @router.post("/", response_model=MantenimientoOut, status_code=status.HTTP_201_CREATED)
 def crear_mantenimiento(m: MantenimientoCreate, db: Session = Depends(get_db)):

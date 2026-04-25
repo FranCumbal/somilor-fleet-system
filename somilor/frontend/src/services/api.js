@@ -1,11 +1,10 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api/v1',
-  timeout: 10000,
+  // Agregamos el /api/v1 al final de tu IP
+  baseURL: 'http://192.168.66.222:8000/api/v1' 
 })
 
-// Adjuntar token JWT a cada request
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('somilor_token')
   if (token) config.headers.Authorization = `Bearer ${token}`
@@ -68,6 +67,7 @@ export const mantenimientoAPI = {
   create: (data) => api.post('/mantenimiento', data),
   update: (id, data) => api.patch(`/mantenimiento/${id}`, data),
   delete: (id) => api.delete(`/mantenimiento/${id}`),
+  catalogo: () => api.get('/mantenimiento/catalogo'), 
 }
 
 export const checklistAPI = {

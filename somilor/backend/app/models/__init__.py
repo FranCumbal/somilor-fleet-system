@@ -3,4 +3,5 @@ from app.models.models import (
     Tanqueo, Mantenimiento, Checklist,
     EstadoVehiculo, TipoVehiculo,
     TipoMantenimiento, EstadoMantenimiento,
+    CatalogoMantenimiento,
 )

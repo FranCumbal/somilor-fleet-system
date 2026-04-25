@@ -139,7 +139,8 @@ export default function ChecklistPage() {
   }
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+    // MAGIA 1: minWidth: 0, width: 100%
+    <div style={{ display:'flex', flexDirection:'column', gap:20, minWidth: 0, width: '100%' }}>
       <PageHeader title="Checklist Pre-operacional" subtitle="Validación de salida de vehículos">
         <Btn variant={showForm ? "ghost" : "primary"} onClick={() => { cerrarFormulario(); setShowForm(!showForm); }}>
           {showForm ? 'Volver al panel' : '+ Nueva inspección'}
@@ -195,7 +196,7 @@ export default function ChecklistPage() {
                   </div>
                 </div>
 
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1px', background:'var(--border-soft)' }}>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:'1px', background:'var(--border-soft)' }}>
                   {ITEMS.map(item => (
                     <div key={item.key} style={{ background:'var(--panel)', padding:'14px 18px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
                       <div style={{ display:'flex', alignItems:'center', gap:10, fontSize:13 }}>
@@ -225,10 +226,10 @@ export default function ChecklistPage() {
                   ))}
                 </div>
 
-                <div style={{ padding:'16px 20px', borderTop:'1px solid var(--border-soft)', display:'flex', gap:16, alignItems:'center', justifyContent:'space-between' }}>
+                <div style={{ padding:'16px 20px', borderTop:'1px solid var(--border-soft)', display:'flex', flexWrap:'wrap', gap:16, alignItems:'center', justifyContent:'space-between' }}>
                   <textarea placeholder="Observaciones adicionales..." value={f.observaciones}
                     onChange={e => updateField(f.idRef, 'observaciones', e.target.value)} rows={2}
-                    style={{ flex:1, background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'8px 12px', color:'var(--text-1)', fontSize:12, outline:'none', resize:'none', fontFamily:'DM Sans' }}
+                    style={{ flex:1, minWidth:'250px', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'8px 12px', color:'var(--text-1)', fontSize:12, outline:'none', resize:'none', fontFamily:'DM Sans' }}
                   />
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <div>
@@ -280,54 +281,59 @@ export default function ChecklistPage() {
             </div>
           )}
 
-          <Panel>
+          {/* MAGIA 2: maxWidth: 100%, overflow: hidden en Paneles */}
+          <Panel style={{ maxWidth: '100%', overflow: 'hidden' }}>
             <PanelHeader title="Historial de checklists recientes" />
             {loading ? <LoadingSpinner /> : checklists.length === 0 ? <EmptyState message="Sin checklists registrados" /> : (
-              <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                <thead>
-                  <tr>
-                    {['Fecha','Placa/Vehículo','Chofer','Turno','Resultado','Observaciones','Acciones'].map(h => (
-                      <th key={h} style={{ padding:'10px 20px', textAlign:'left', fontSize:10, fontWeight:500, textTransform:'uppercase', letterSpacing:'0.12em', color:'var(--text-3)', borderBottom:'1px solid var(--border-soft)', background:'var(--panel2)' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {checklists.map(c => (
-                    <tr key={c.id} onMouseEnter={e => e.currentTarget.style.background='var(--panel2)'} onMouseLeave={e => e.currentTarget.style.background='transparent'} style={{ transition:'background 0.15s' }}>
-                      <td style={{ padding:'13px 20px', fontSize:11, fontFamily:'Space Mono', color:'var(--text-3)', borderBottom:'1px solid var(--border-soft)' }}>
-                        {new Date(c.fecha).toLocaleString('es-EC', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })}
-                      </td>
-                      <td style={{ padding:'13px 20px', borderBottom:'1px solid var(--border-soft)' }}>
-                        <div style={{ fontFamily:'Space Mono', fontSize:12, color:'var(--gold-light)', fontWeight:700 }}>
-                          {c.vehiculo?.placa || c.vehiculo?.codigo || `V-${c.vehiculo_id}`}
-                        </div>
-                        {c.vehiculo?.marca && <div style={{ fontSize:10, color:'var(--text-3)' }}>{c.vehiculo.marca} {c.vehiculo.modelo}</div>}
-                      </td>
-                      <td style={{ padding:'13px 20px', fontSize:13, color:'var(--text-2)', borderBottom:'1px solid var(--border-soft)' }}>
-                        {c.chofer ? `${c.chofer.nombre} ${c.chofer.apellido}` : '—'}
-                      </td>
-                      <td style={{ padding:'13px 20px', fontSize:12, color:'var(--text-3)', textTransform:'capitalize', borderBottom:'1px solid var(--border-soft)' }}>{c.turno}</td>
-                      <td style={{ padding:'13px 20px', borderBottom:'1px solid var(--border-soft)' }}>
-                        {c.aprobado === null
-                          ? <span style={{ fontSize:11, color:'var(--amber)' }}>Pendiente</span>
-                          : c.aprobado
-                            ? <span style={{ fontSize:11, color:'var(--green)', fontWeight:600 }}>✓ Aprobado</span>
-                            : <span style={{ fontSize:11, color:'var(--red)', fontWeight:600 }}>✗ Reprobado</span>
-                        }
-                      </td>
-                      <td style={{ padding:'13px 20px', fontSize:12, color:'var(--text-3)', borderBottom:'1px solid var(--border-soft)', maxWidth:200, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                        {c.observaciones || '—'}
-                      </td>
-                      <td style={{ padding:'13px 20px', borderBottom:'1px solid var(--border-soft)' }}>
-                        <div style={{ display:'flex', gap:8 }}>
-                          <button onClick={() => cargarDatosEdicion(c)} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(77,156,240,0.1)', color:'var(--blue)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }} title="Editar">✏️</button>
-                          <button onClick={() => eliminarChecklist(c.id)} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(224,82,82,0.1)', color:'var(--red)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }} title="Eliminar">🗑️</button>
-                        </div>
-                      </td>
+              
+              /* MAGIA 3: Contenedor scrolleable, minWidth y whiteSpace nowrap */
+              <div className="table-responsive-container" style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '8px' }}>
+                <table style={{ width:'100%', borderCollapse:'collapse', minWidth: '900px' }}>
+                  <thead>
+                    <tr>
+                      {['Fecha','Placa/Vehículo','Chofer','Turno','Resultado','Observaciones','Acciones'].map(h => (
+                        <th key={h} style={{ padding:'10px 20px', textAlign:'left', fontSize:10, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.12em', color:'var(--text-3)', borderBottom:'1px solid var(--border-soft)', background:'var(--panel2)', whiteSpace:'nowrap' }}>{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {checklists.map(c => (
+                      <tr key={c.id} onMouseEnter={e => e.currentTarget.style.background='var(--panel2)'} onMouseLeave={e => e.currentTarget.style.background='transparent'} style={{ transition:'background 0.15s' }}>
+                        <td style={{ padding:'13px 20px', fontSize:11, fontFamily:'Space Mono', color:'var(--text-3)', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>
+                          {new Date(c.fecha).toLocaleString('es-EC', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })}
+                        </td>
+                        <td style={{ padding:'13px 20px', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>
+                          <div style={{ fontFamily:'Space Mono', fontSize:12, color:'var(--gold-light)', fontWeight:700 }}>
+                            {c.vehiculo?.placa || c.vehiculo?.codigo || `V-${c.vehiculo_id}`}
+                          </div>
+                          {c.vehiculo?.marca && <div style={{ fontSize:10, color:'var(--text-3)' }}>{c.vehiculo.marca} {c.vehiculo.modelo}</div>}
+                        </td>
+                        <td style={{ padding:'13px 20px', fontSize:13, color:'var(--text-2)', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>
+                          {c.chofer ? `${c.chofer.nombre} ${c.chofer.apellido}` : '—'}
+                        </td>
+                        <td style={{ padding:'13px 20px', fontSize:12, color:'var(--text-3)', textTransform:'capitalize', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>{c.turno}</td>
+                        <td style={{ padding:'13px 20px', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>
+                          {c.aprobado === null
+                            ? <span style={{ fontSize:11, color:'var(--amber)' }}>Pendiente</span>
+                            : c.aprobado
+                              ? <span style={{ fontSize:11, color:'var(--green)', fontWeight:600 }}>✓ Aprobado</span>
+                              : <span style={{ fontSize:11, color:'var(--red)', fontWeight:600 }}>✗ Reprobado</span>
+                          }
+                        </td>
+                        <td style={{ padding:'13px 20px', fontSize:12, color:'var(--text-3)', borderBottom:'1px solid var(--border-soft)', maxWidth:200, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={c.observaciones}>
+                          {c.observaciones || '—'}
+                        </td>
+                        <td style={{ padding:'13px 20px', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>
+                          <div style={{ display:'flex', gap:8 }}>
+                            <button onClick={() => cargarDatosEdicion(c)} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(77,156,240,0.1)', color:'var(--blue)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }} title="Editar">✏️</button>
+                            <button onClick={() => eliminarChecklist(c.id)} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(224,82,82,0.1)', color:'var(--red)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }} title="Eliminar">🗑️</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </Panel>
         </>

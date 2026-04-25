@@ -121,6 +121,14 @@ class TanqueoOut(TanqueoCreate):
     es_anomalia: bool
     class Config: from_attributes = True
 
+class CatalogoMantenimientoOut(BaseModel):
+    id: int
+    tipo_vehiculo: str
+    clase: str
+    sistema: str
+    descripcion: str
+    frecuencia_estimada: Optional[str] = None
+    class Config: from_attributes = True
 
 # ── MANTENIMIENTO ─────────────────────────────
 class MantenimientoCreate(BaseModel):

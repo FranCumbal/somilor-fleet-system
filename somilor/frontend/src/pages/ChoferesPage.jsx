@@ -92,7 +92,8 @@ export default function ChoferesPage() {
   const iniciales = (c) => `${c.nombre[0]}${c.apellido[0]}`
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+    /* MAGIA: minWidth: 0, width: '100%' para evitar que se desborde */
+    <div style={{ display:'flex', flexDirection:'column', gap:20, minWidth: 0, width: '100%' }}>
       <PageHeader title="Directorio de Choferes" subtitle={`${choferes.length} choferes registrados`}>
         <Btn variant={showForm ? "ghost" : "primary"} onClick={() => { cerrarFormulario(); setShowForm(!showForm); }}>
           {showForm ? 'Volver al directorio' : '+ Nuevo chofer'}
