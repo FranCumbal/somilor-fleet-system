@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { combustibleAPI, vehiculosAPI, choferesAPI } from '../services/api'
-import { Panel, PanelHeader, PageHeader, Btn, LoadingSpinner, EmptyState } from '../components/layout/UI'
+import { Panel, PanelHeader, PageHeader, Btn, LoadingSpinner, EmptyState, Chip } from '../components/layout/UI'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 
 const idUnico = () => Math.random().toString(36).substr(2, 9)
@@ -24,6 +24,9 @@ export default function CombustiblePage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [detalleActivo, setDetalleActivo] = useState(null)
+
+  // Estado para el filtro de tiempo
+  const [periodoActivo, setPeriodoActivo] = useState('mes')
 
   const cargar = () => {
     setLoading(true)
@@ -117,25 +120,78 @@ export default function CombustiblePage() {
     }
   }
 
-  // --- CÁLCULOS DINÁMICOS PARA KPIs ---
-  const hoyStr = new Date().toLocaleDateString('es-EC')
-  const costoHoy = tanqueos.filter(t => new Date(t.fecha).toLocaleDateString('es-EC') === hoyStr).reduce((acc, t) => acc + (t.costo_total || 0), 0)
-  const costoTotalMes = tanqueos.reduce((acc, t) => acc + (t.costo_total || 0), 0)
-  const totalTickets = tanqueos.length
+  // --- LÓGICA DE FILTRADO POR FECHAS ---
+  const getFechaInicio = () => {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    switch (periodoActivo) {
+      case 'hoy': 
+        return d
+      case 'semana': {
+        const day = d.getDay()
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+        return new Date(d.setDate(diff))
+      }
+      case 'mes': 
+        return new Date(d.getFullYear(), d.getMonth(), 1)
+      case 'ano': 
+        return new Date(d.getFullYear(), 0, 1)
+      default: 
+        return new Date(0) // 'todo'
+    }
+  }
 
-  // --- CONSTRUCCIÓN DE LA GRÁFICA EN TIEMPO REAL ---
-  const chartDataObj = {}
-  tanqueos.forEach(t => {
-    const dia = new Date(t.fecha).toLocaleDateString('es-EC', { day: '2-digit', month: 'short' })
-    chartDataObj[dia] = (chartDataObj[dia] || 0) + (t.costo_total || 0)
-  })
-  const chartData = Object.keys(chartDataObj).map(dia => ({ dia, costo: chartDataObj[dia] })).slice(0, 7).reverse()
+  const fechaInicioFiltro = getFechaInicio()
+
+  // Filtrar los datos en base a la fecha calculada
+  const tanqueosFiltrados = tanqueos.filter(t => new Date(t.fecha) >= fechaInicioFiltro)
+
+  // --- CÁLCULOS DINÁMICOS PARA KPIs ---
+  const inversionPeriodo = tanqueosFiltrados.reduce((acc, t) => acc + (t.costo_total || 0), 0)
+  const totalTanqueosPeriodo = tanqueosFiltrados.length
+  
+  const getLabelInversion = () => {
+    switch(periodoActivo) {
+      case 'hoy': return 'Inversión de Hoy'
+      case 'semana': return 'Inversión Semanal'
+      case 'mes': return 'Inversión Mensual'
+      case 'ano': return 'Inversión Anual'
+      default: return 'Inversión Histórica'
+    }
+  }
+
+  // --- CONSTRUCCIÓN DE LA GRÁFICA DINÁMICA ---
+  let chartData = []
+  if (periodoActivo === 'hoy') {
+    const chartHorasObj = {}
+    tanqueosFiltrados.forEach(t => {
+      const hora = new Date(t.fecha).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })
+      chartHorasObj[hora] = (chartHorasObj[hora] || 0) + (t.costo_total || 0)
+    })
+    // Ordenar horas cronológicamente
+    chartData = Object.keys(chartHorasObj).sort().map(hora => ({ dia: hora, costo: chartHorasObj[hora] })).slice(-15)
+  } else {
+    const chartDataObj = {}
+    tanqueosFiltrados.forEach(t => {
+      const dia = new Date(t.fecha).toLocaleDateString('es-EC', { day: '2-digit', month: 'short' })
+      chartDataObj[dia] = (chartDataObj[dia] || 0) + (t.costo_total || 0)
+    })
+    // Invertir para mostrar lo antiguo a la izquierda y lo más reciente a la derecha
+    chartData = Object.keys(chartDataObj).map(dia => ({ dia, costo: chartDataObj[dia] })).slice(0, 15).reverse()
+  }
 
   const handleChartClick = (state) => {
     if (state && state.activePayload) {
-      const diaSeleccionado = state.activePayload[0].payload.dia
-      const datosDia = tanqueos.filter(t => new Date(t.fecha).toLocaleDateString('es-EC', { day: '2-digit', month: 'short' }) === diaSeleccionado)
-      setDetalleActivo({ tipo: `Registros del ${diaSeleccionado}`, data: datosDia })
+      const valorSeleccionado = state.activePayload[0].payload.dia
+      let datosDia = []
+      
+      // La lógica del modal también se adapta si filtramos por horas o días
+      if (periodoActivo === 'hoy') {
+        datosDia = tanqueosFiltrados.filter(t => new Date(t.fecha).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' }) === valorSeleccionado)
+      } else {
+        datosDia = tanqueosFiltrados.filter(t => new Date(t.fecha).toLocaleDateString('es-EC', { day: '2-digit', month: 'short' }) === valorSeleccionado)
+      }
+      setDetalleActivo({ tipo: `Registros de: ${valorSeleccionado}`, data: datosDia })
     }
   }
 
@@ -225,11 +281,39 @@ export default function CombustiblePage() {
         </form>
       ) : (
         <>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14 }}>
+          {/* Controles de Filtro de Tiempo */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '5px' }}>
+            <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Filtrar período:</span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {[
+                { id: 'hoy', label: 'Hoy' },
+                { id: 'semana', label: 'Esta Semana' },
+                { id: 'mes', label: 'Este Mes' },
+                { id: 'ano', label: 'Este Año' },
+                { id: 'todo', label: 'Histórico' }
+              ].map(opt => (
+                <Chip key={opt.id} active={periodoActivo === opt.id} onClick={() => setPeriodoActivo(opt.id)}>
+                  {opt.label}
+                </Chip>
+              ))}
+            </div>
+          </div>
+
+          {/* KPIs DINÁMICOS REDUCIDOS A 2 COLUMNAS */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:14 }}>
             {[
-              { label:'Gasto de Hoy', value:`$${costoHoy.toFixed(2)}`, accent:'var(--gold)', data: tanqueos.filter(t => new Date(t.fecha).toLocaleDateString('es-EC') === hoyStr) },
-              { label:'Inversión Total', value: `$${costoTotalMes.toFixed(2)}`, accent:'var(--blue)', data: tanqueos },
-              { label:'Tickets Registrados', value: totalTickets, accent:'var(--green)', data: tanqueos },
+              { 
+                label: getLabelInversion(), 
+                value: `$${inversionPeriodo.toFixed(2)}`, 
+                accent:'var(--gold)', 
+                data: tanqueosFiltrados 
+              },
+              { 
+                label:'Tanqueos Registrados', 
+                value: totalTanqueosPeriodo, 
+                accent:'var(--blue)', 
+                data: tanqueosFiltrados 
+              },
             ].map(k => (
               <div key={k.label} 
                    onClick={() => setDetalleActivo({ tipo: k.label, data: k.data })}
@@ -244,10 +328,10 @@ export default function CombustiblePage() {
           </div>
 
           <Panel style={{ maxWidth: '100%', overflow: 'hidden' }}>
-            <PanelHeader title="Inversión Diaria (USD) ➔" />
+            <PanelHeader title={`Evolución del Gasto (USD) — ${periodoActivo === 'hoy' ? 'Horas' : 'Días'} ➔`} />
             <div style={{ padding:'20px 20px 10px' }}>
               {chartData.length === 0 ? (
-                 <div style={{ display: 'flex', height: 180, alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Sin datos suficientes para graficar</div>
+                 <div style={{ display: 'flex', height: 180, alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Sin datos suficientes en este período</div>
               ) : (
                 <ResponsiveContainer width="100%" height={180}>
                   <BarChart data={chartData} margin={{ top:10, right:10, left:-20, bottom:0 }} onClick={handleChartClick}>
@@ -264,8 +348,8 @@ export default function CombustiblePage() {
           </Panel>
 
           <Panel style={{ maxWidth: '100%', overflow: 'hidden' }}>
-            <PanelHeader title="Historial Financiero" />
-            {loading ? <LoadingSpinner /> : tanqueos.length === 0 ? <EmptyState message="Sin registros financieros" /> : (
+            <PanelHeader title={`Historial Financiero — ${periodoActivo}`} />
+            {loading ? <LoadingSpinner /> : tanqueosFiltrados.length === 0 ? <EmptyState message="Sin registros financieros en este período" /> : (
               <div className="table-responsive-container" style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '8px' }}>
                 <table style={{ width:'100%', borderCollapse:'collapse', minWidth: '700px' }}>
                   <thead>
@@ -276,7 +360,7 @@ export default function CombustiblePage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {tanqueos.map(t => (
+                    {tanqueosFiltrados.map(t => (
                       <tr key={t.id} 
                           onClick={() => setDetalleActivo({ tipo: 'Factura Detallada', data: t })}
                           onMouseEnter={e => e.currentTarget.style.background='var(--panel2)'} 

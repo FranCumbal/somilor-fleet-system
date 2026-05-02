@@ -36,20 +36,23 @@ body.light-theme {
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+html, body {
+  height: 100dvh;
+  overscroll-behavior-y: none; 
+}
+
 body {
   background: var(--dark-bg);
   color: var(--text-1);
   font-family: 'DM Sans', sans-serif;
-  min-height: 100vh;
+  min-height: 100dvh; 
 }
 
-/* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--panel); }
 ::-webkit-scrollbar-thumb { background: var(--panel3); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--gold-dim); }
 
-/* Utilities */
 .font-mono { font-family: 'Space Mono', monospace; }
 
 .status-operativo { color: var(--green); background: rgba(61,200,122,0.1); }
@@ -118,4 +121,24 @@ body {
 }
 .table-responsive-container::-webkit-scrollbar-thumb:hover {
   background: var(--gold-dim);
+}
+
+
+/* =========================================================
+   CORRECCIONES NATIVAS PARA IOS / SAFARI
+========================================================= */
+
+.app-container {
+  height: 100dvh !important;
+}
+
+.content-area {
+  padding-bottom: calc(24px + env(safe-area-inset-bottom)) !important;
+  -webkit-overflow-scrolling: touch; 
+}
+
+@media screen and (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
 }
