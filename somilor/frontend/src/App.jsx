@@ -8,6 +8,7 @@ import ChoferesPage from './pages/ChoferesPage'
 import CombustiblePage from './pages/CombustiblePage'
 import MantenimientoPage from './pages/MantenimientoPage'
 import ChecklistPage from './pages/ChecklistPage'
+import AsignacionesPage from './pages/AsignacionesPage' 
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -26,6 +27,7 @@ function AppRoutes() {
       <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard"      element={<DashboardPage />} />
+        <Route path="asignaciones"   element={<AsignacionesPage />} />
         <Route path="vehiculos"      element={<VehiculosPage />} />
         <Route path="choferes"       element={<ChoferesPage />} />
         <Route path="combustible"    element={<CombustiblePage />} />

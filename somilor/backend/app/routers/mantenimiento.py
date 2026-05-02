@@ -4,11 +4,10 @@ from sqlalchemy import func
 from typing import List, Optional
 from datetime import datetime, timedelta
 from app.database import get_db
-from app.models import Mantenimiento, EstadoMantenimiento, Vehiculo, CatalogoMantenimiento
+from app.models import Mantenimiento, EstadoMantenimiento, Vehiculo, CatalogoMantenimiento, Asignacion
 from app.schemas import MantenimientoCreate, MantenimientoOut, MantenimientoUpdate, CatalogoMantenimientoOut
 
 router = APIRouter(prefix="/mantenimiento", tags=["Mantenimiento"])
-
 
 @router.get("/", response_model=List[MantenimientoOut])
 def listar_mantenimientos(
@@ -25,10 +24,8 @@ def listar_mantenimientos(
         q = q.filter(Mantenimiento.estado == estado)
     return q.order_by(Mantenimiento.fecha_programada.asc()).offset(skip).limit(limit).all()
 
-
 @router.get("/alertas")
 def alertas_mantenimiento(db: Session = Depends(get_db)):
-    """Retorna mantenimientos vencidos y próximos (próximos 7 días)."""
     ahora = datetime.utcnow()
     pronto = ahora + timedelta(days=7)
 
@@ -52,7 +49,6 @@ def alertas_mantenimiento(db: Session = Depends(get_db)):
 
 @router.get("/catalogo", response_model=List[CatalogoMantenimientoOut])
 def listar_catalogo(tipo_vehiculo: Optional[str] = None, db: Session = Depends(get_db)):
-    """Obtiene la lista estandarizada de procedimientos desde la base de datos"""
     q = db.query(CatalogoMantenimiento)
     if tipo_vehiculo:
         q = q.filter(CatalogoMantenimiento.tipo_vehiculo == tipo_vehiculo)
@@ -69,7 +65,6 @@ def crear_mantenimiento(m: MantenimientoCreate, db: Session = Depends(get_db)):
     db.refresh(db_m)
     return db_m
 
-
 @router.patch("/{mantenimiento_id}", response_model=MantenimientoOut)
 def actualizar_mantenimiento(mantenimiento_id: int, update: MantenimientoUpdate, db: Session = Depends(get_db)):
     m = db.query(Mantenimiento).filter(Mantenimiento.id == mantenimiento_id).first()
@@ -79,11 +74,20 @@ def actualizar_mantenimiento(mantenimiento_id: int, update: MantenimientoUpdate,
     for field, value in update.model_dump(exclude_unset=True).items():
         setattr(m, field, value)
 
-    # Si se completa, actualizar estado del vehículo si estaba en taller
-    if update.estado == EstadoMantenimiento.completado:
+    if update.estado:
         vehiculo = db.query(Vehiculo).filter(Vehiculo.id == m.vehiculo_id).first()
-        if vehiculo and vehiculo.estado.value == "taller":
-            vehiculo.estado = "libre"
+        if vehiculo:
+            if update.estado == EstadoMantenimiento.en_proceso:
+                vehiculo.estado = "taller"
+            elif update.estado == EstadoMantenimiento.completado:
+                asignacion = db.query(Asignacion).filter(
+                    Asignacion.vehiculo_id == vehiculo.id,
+                    Asignacion.activa == True
+                ).first()
+                if asignacion:
+                    vehiculo.estado = "operativo"
+                else:
+                    vehiculo.estado = "libre"
 
     db.commit()
     db.refresh(m)

@@ -87,6 +87,7 @@ class AsignacionOut(BaseModel):
     fecha_inicio: datetime
     fecha_fin: Optional[datetime]
     activa: bool
+    observaciones: Optional[str] = None 
     vehiculo: VehiculoOut
     chofer: ChoferOut
     class Config: from_attributes = True

@@ -3,8 +3,6 @@ import { dashboardAPI } from '../services/api'
 import { KpiCard, Panel, PanelHeader, PageHeader, StatusPill } from '../components/layout/UI'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 
-// Dejamos temporalmente esta lista estática solo para que el modal de "Choferes" no se rompa, 
-// ya que en este paso conectamos los vehículos, mantenimientos y gasolina.
 const choferesList = [
   { nombre: 'Carlos Ruiz', unidad: 'GSD-9876', licencia: 'Tipo E', turno: 'Diurno' },
   { nombre: 'Luis Perez', unidad: 'UBA-4321', licencia: 'Tipo C', turno: 'Nocturno' },
@@ -13,6 +11,22 @@ const choferesList = [
 
 const dotColor = { red:'var(--red)', amber:'var(--amber)', blue:'var(--blue)' }
 
+const VehiculoStatus = ({ estado }) => {
+  const st = estado?.toLowerCase() || ''
+  const map = {
+    operativo: { label:'Operativo', color:'var(--green)', bg:'rgba(61,200,122,0.1)' },
+    taller:    { label:'En Taller', color:'var(--red)',   bg:'rgba(224,82,82,0.1)' },
+    libre:     { label:'Libre',     color:'var(--amber)', bg:'rgba(240,167,66,0.1)' },
+  }
+  const m = map[st] || { label: estado, color:'var(--text-2)', bg:'var(--panel2)' }
+  return (
+    <span style={{ display:'inline-flex', alignItems:'center', gap:6, fontSize:11, padding:'4px 12px', borderRadius:20, fontWeight:600, color: m.color, background: m.bg, whiteSpace: 'nowrap' }}>
+      <span style={{ width:5, height:5, borderRadius:'50%', background:'currentColor', display:'inline-block' }} />
+      {m.label}
+    </span>
+  )
+}
+
 export default function DashboardPage() {
   const [kpis, setKpis] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -20,7 +34,6 @@ export default function DashboardPage() {
   const [detalleActivo, setDetalleActivo] = useState(null)
 
   useEffect(() => {
-    // Ahora todo se carga exclusivamente desde la base de datos a través del API
     dashboardAPI.kpis()
       .then(r => setKpis(r.data))
       .catch(err => console.error("Error cargando dashboard:", err))
@@ -38,17 +51,13 @@ export default function DashboardPage() {
     }
   }
 
-  // --- EXTRACCIÓN SEGURA DE DATOS DEL BACKEND ---
-  // Si kpis aún no carga, usamos un objeto vacío para no romper la pantalla
   const k = kpis || {}
   
-  // Extraemos las listas que envía Python (con un fallback [] por si acaso)
   const fuelData = k.consumo_semana || []
   const flotaCompleta = k.flota_completa || []
   const mantenimientosData = k.mantenimientos_data || []
   const alertas = k.alertas || []
 
-  // Calculamos el total de vehículos dinámicamente para las barras de progreso
   const totalVehiculos = (k.vehiculos_operativos || 0) + (k.vehiculos_taller || 0) + (k.vehiculos_libres || 0)
 
   return (
@@ -74,9 +83,9 @@ export default function DashboardPage() {
         <button onClick={() => showToast('El registro rápido estará disponible próximamente')} style={{ padding:'8px 16px', borderRadius:8, fontSize:13, background:'var(--gold)', color:'#0E1117', border:'none', cursor:'pointer', fontWeight:600 }}>+ Registrar</button>
       </PageHeader>
 
-      {/* 1. KPIs BÁSICOS (Conectados a SQL) */}
+      {/* 1. KPIs BÁSICOS */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:14 }}>
-        <div onClick={() => setDetalleActivo({ tipo: 'Unidades Operativas', data: flotaCompleta.filter(f => f.estado.toLowerCase() === 'operativo') })} style={{cursor:'pointer', transition:'transform 0.2s'}} onMouseOver={e => e.currentTarget.style.transform='translateY(-3px)'} onMouseOut={e => e.currentTarget.style.transform='translateY(0)'}>
+        <div onClick={() => setDetalleActivo({ tipo: 'Unidades Operativas', data: flotaCompleta.filter(f => f.estado.toLowerCase().includes('operativ')) })} style={{cursor:'pointer', transition:'transform 0.2s'}} onMouseOver={e => e.currentTarget.style.transform='translateY(-3px)'} onMouseOut={e => e.currentTarget.style.transform='translateY(0)'}>
           <KpiCard label="Vehículos operativos" value={loading ? '...' : k.vehiculos_operativos ?? 0} delta="Datos en tiempo real" deltaType="up" accent="var(--green)" />
         </div>
         <div onClick={() => setDetalleActivo({ tipo: 'Unidades en Taller', data: flotaCompleta.filter(f => f.estado.toLowerCase().includes('taller')) })} style={{cursor:'pointer', transition:'transform 0.2s'}} onMouseOver={e => e.currentTarget.style.transform='translateY(-3px)'} onMouseOut={e => e.currentTarget.style.transform='translateY(0)'}>
@@ -92,7 +101,7 @@ export default function DashboardPage() {
 
       <div style={{ display:'grid', gridTemplateColumns:'1fr 320px', gap:16 }}>
         
-        {/* 2. GRÁFICO DE COMBUSTIBLE (Conectado a SQL) */}
+        {/* 2. GRÁFICO DE COMBUSTIBLE */}
         <Panel style={{ maxWidth: '100%', overflow: 'hidden', height: '100%' }}>
           <div onClick={() => setDetalleActivo({ tipo: 'Inversión en Combustible', data: fuelData })} style={{ cursor: 'pointer' }} title="Ver registro semanal completo">
             <PanelHeader title="Inversión en Combustible — semana (USD) ➔" />
@@ -117,7 +126,7 @@ export default function DashboardPage() {
           </div>
         </Panel>
 
-        {/* 3. ALERTAS ACTIVAS (Conectadas a Checklists y Anomalías en SQL) */}
+        {/* 3. ALERTAS ACTIVAS */}
         <Panel>
           <div onClick={() => setDetalleActivo({ tipo: 'Todas las Alertas', data: alertas })} style={{ cursor: 'pointer' }} title="Expandir todas las alertas">
             <PanelHeader title="Alertas activas ➔">
@@ -141,19 +150,19 @@ export default function DashboardPage() {
 
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(300px, 1fr))', gap:16 }}>
         
-        {/* 4. DISPONIBILIDAD DE FLOTA (Calculada dinámicamente) */}
+        {/* 4. DISPONIBILIDAD DE FLOTA */}
         <Panel>
-          <div onClick={() => setDetalleActivo({ tipo: 'Estado General de Flota', data: flotaCompleta })} style={{ cursor: 'pointer' }}>
+          <div onClick={() => setDetalleActivo({ tipo: 'Unidades: Estado General', data: flotaCompleta })} style={{ cursor: 'pointer' }}>
             <PanelHeader title="Disponibilidad de flota ➔" />
           </div>
           <div style={{ padding:'20px' }}>
             {[
-              { label:'Operativos', val: k.vehiculos_operativos ?? 0, total: totalVehiculos || 1, color:'var(--green)' },
-              { label:'En taller',  val: k.vehiculos_taller ?? 0,  total: totalVehiculos || 1, color:'var(--red)' },
-              { label:'Libres',     val: k.vehiculos_libres ?? 0,  total: totalVehiculos || 1, color:'var(--amber)' },
+              { label:'Operativos', val: k.vehiculos_operativos ?? 0, total: totalVehiculos || 1, color:'var(--green)', keyword: 'operativ' },
+              { label:'En taller',  val: k.vehiculos_taller ?? 0,  total: totalVehiculos || 1, color:'var(--red)', keyword: 'taller' },
+              { label:'Libres',     val: k.vehiculos_libres ?? 0,  total: totalVehiculos || 1, color:'var(--amber)', keyword: 'libre' },
             ].map(row => (
               <div key={row.label} 
-                   onClick={() => setDetalleActivo({ tipo: `Unidades: ${row.label}`, data: flotaCompleta.filter(f => f.estado.toLowerCase().includes(row.label.toLowerCase().replace('en ', ''))) })} 
+                   onClick={() => setDetalleActivo({ tipo: `Unidades: ${row.label}`, data: flotaCompleta.filter(f => f.estado.toLowerCase().includes(row.keyword)) })} 
                    style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14, cursor:'pointer', padding: '4px 8px', borderRadius: 8, transition: 'background 0.2s' }} onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
                 <div style={{ fontSize:12, color:'var(--text-2)', width:90 }}>{row.label}</div>
                 <div style={{ flex:1, height:6, background:'var(--panel2)', borderRadius:3, overflow:'hidden' }}>
@@ -165,7 +174,7 @@ export default function DashboardPage() {
           </div>
         </Panel>
 
-        {/* 5. MANTENIMIENTOS (Conectados a SQL) */}
+        {/* 5. MANTENIMIENTOS */}
         <Panel style={{ maxWidth: '100%', overflow: 'hidden' }}>
           <div onClick={() => setDetalleActivo({ tipo: 'Mantenimientos Programados', data: mantenimientosData })} style={{ cursor: 'pointer' }}>
             <PanelHeader title="Mantenimientos próximos ➔" />
@@ -194,7 +203,7 @@ export default function DashboardPage() {
       {/* ========================================================= */}
       {detalleActivo && (
         <div onClick={() => setDetalleActivo(null)} style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(10, 12, 17, 0.85)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, animation: 'fadeInModal 0.2s ease-out', padding: '20px' }}>
-          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: detalleActivo.data && Array.isArray(detalleActivo.data) ? '700px' : '500px', background: 'var(--panel)', borderRadius: 16, padding: '30px', border: '1px solid var(--border-soft)', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: Array.isArray(detalleActivo.data) ? '700px' : '500px', background: 'var(--panel)', borderRadius: 16, padding: '30px', border: '1px solid var(--border-soft)', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', maxHeight: '90vh', overflowY: 'auto' }}>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 15, borderBottom: '1px solid var(--border-soft)' }}>
               <h2 style={{ margin: 0, color: 'var(--gold-light)', fontSize: 18 }}>{detalleActivo.tipo}</h2>
@@ -203,15 +212,15 @@ export default function DashboardPage() {
 
             <div style={{ color: 'var(--text-2)' }}>
               
-              {/* Lógica: TABLAS DE FLOTA (Operativos, Taller, Libres) */}
-              {Array.isArray(detalleActivo.data) && detalleActivo.data[0]?.modelo && (
+              {/* Lógica: TABLAS DE FLOTA (Operativos, Taller, Libres, etc) */}
+              {detalleActivo.tipo.includes('Unidades') && (
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', minWidth: '450px', borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead>
                       <tr style={{ textAlign: 'left', color: 'var(--text-3)', borderBottom: '1px solid var(--border-soft)' }}>
                         <th style={{ padding: '10px' }}>Unidad</th>
+                        <th style={{ padding: '10px' }}>Chofer Asignado</th>
                         <th style={{ padding: '10px' }}>Estado Actual</th>
-                        <th style={{ padding: '10px' }}>Responsable / Asignación</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -220,12 +229,12 @@ export default function DashboardPage() {
                         <tr key={i} style={{ borderBottom: '1px solid var(--border-soft)' }}>
                           <td style={{ padding: '12px 10px' }}>
                             <div style={{ color: '#fff', fontWeight: 600, fontFamily: 'Space Mono' }}>{v.placa}</div>
-                            <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{v.modelo || v.vehiculo}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{v.marca} {v.modelo}</div>
                           </td>
-                          <td style={{ padding: '12px 10px' }}>
-                             <StatusPill status={v.estado.toLowerCase() === 'operativo' ? 'completado' : (v.estado.toLowerCase() === 'libre' ? 'programado' : 'vencido')} overrideText={v.estado} />
+                          <td style={{ padding: '12px 10px', color: v.responsable !== 'Sin asignar' ? 'var(--gold-light)' : 'var(--text-3)' }}>
+                            {v.responsable}
                           </td>
-                          <td style={{ padding: '12px 10px' }}>{v.responsable}</td>
+                          <td style={{ padding: '12px 10px' }}><VehiculoStatus estado={v.estado} /></td>
                         </tr>
                       ))}
                     </tbody>
@@ -233,8 +242,8 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {/* Lógica: TABLA DE CHOFERES (Aún estática) */}
-              {Array.isArray(detalleActivo.data) && detalleActivo.data[0]?.licencia && (
+              {/* Lógica: TABLA DE CHOFERES */}
+              {detalleActivo.tipo === 'Nómina de Choferes' && (
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', minWidth: '450px', borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead>
@@ -256,7 +265,7 @@ export default function DashboardPage() {
               {/* Lógica: TODAS LAS ALERTAS */}
               {detalleActivo.tipo === 'Todas las Alertas' && (
                 <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                   {detalleActivo.data.length === 0 ? <p>No hay alertas activas.</p> : null}
+                   {detalleActivo.data.length === 0 ? <p style={{textAlign:'center', padding:20}}>No hay alertas activas.</p> : null}
                    {detalleActivo.data.map((a, i) => (
                      <div key={i} style={{ background:'var(--panel2)', padding:15, borderRadius:8, borderLeft: `4px solid ${dotColor[a.tipo]}` }}>
                        <div style={{fontWeight:'bold', color:'#fff', marginBottom:4}}>{a.titulo}</div>
@@ -344,11 +353,47 @@ export default function DashboardPage() {
                 </div>
               )}
 
+              {/* Lógica: Ficha Técnica de 1 solo Vehículo desde el Modal */}
+              {!Array.isArray(detalleActivo.data) && detalleActivo.tipo.includes('Unidades') && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+                    <div>
+                      <div style={{ fontSize: 24, fontWeight: 'bold', color: '#fff', fontFamily: 'Space Mono' }}>{detalleActivo.data.placa || 'SIN PLACA'}</div>
+                      <div style={{ fontSize: 14, color: 'var(--gold-light)' }}>{detalleActivo.data.marca} {detalleActivo.data.modelo} ({detalleActivo.data.anio || 'N/A'})</div>
+                    </div>
+                    <VehiculoStatus estado={detalleActivo.data.estado} />
+                  </div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 15, marginBottom: 20 }}>
+                    <div style={{ background: 'var(--panel2)', padding: '15px', borderRadius: 8, border: '1px solid var(--border-soft)' }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Uso Registrado</div>
+                      <div style={{ fontSize: 16, fontWeight: 600, color: '#fff', marginTop: 5, fontFamily: 'Space Mono' }}>
+                         {detalleActivo.data.tipo === 'maquinaria' ? `${detalleActivo.data.horas_operacion} h` : `${detalleActivo.data.kilometraje_actual.toLocaleString()} km`}
+                      </div>
+                    </div>
+                    <div style={{ background: 'var(--panel2)', padding: '15px', borderRadius: 8, border: '1px solid var(--border-soft)' }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Combustible</div>
+                      <div style={{ display:'flex', alignItems:'center', gap:8, marginTop: 5 }}>
+                        <div style={{ width: '100%', height:6, background:'var(--panel3)', borderRadius:3, overflow:'hidden' }}>
+                          <div style={{ height:'100%', borderRadius:3, background: detalleActivo.data.nivel_combustible < 25 ? 'var(--red)' : detalleActivo.data.nivel_combustible < 50 ? 'var(--amber)' : 'var(--green)', width:`${detalleActivo.data.nivel_combustible}%` }} />
+                        </div>
+                        <span style={{ fontSize:13, fontWeight: 600, fontFamily:'Space Mono', color: '#fff' }}>{detalleActivo.data.nivel_combustible}%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 15, fontSize: 13, color: 'var(--text-2)', padding: '15px', background: 'var(--panel2)', borderRadius: 8 }}>
+                    <div><strong style={{ color: '#fff' }}>Tipo:</strong> <span style={{ textTransform: 'capitalize' }}>{detalleActivo.data.tipo}</span></div>
+                    <div><strong style={{ color: '#fff' }}>Color:</strong> {detalleActivo.data.color || 'No especificado'}</div>
+                  </div>
+                </div>
+              )}
+
             </div>
           </div>
         </div>
       )}
-
+      
       <style>{`
         @keyframes toastPopUp { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
         @keyframes fadeInModal { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }

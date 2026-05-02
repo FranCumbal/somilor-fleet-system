@@ -8,6 +8,7 @@ import logo from '../../assets/SomilorLogo.png'
 
 const navItems = [
   { to: '/dashboard',     icon: '▦',  label: 'Panel principal' },
+  { to: '/asignaciones',  icon: '🔑', label: 'Asignaciones' },
   { to: '/vehiculos',     icon: '🚛', label: 'Flota' },
   { to: '/choferes',      icon: '👷', label: 'Choferes' },
   { to: '/combustible',   icon: '⛽', label: 'Combustible' },

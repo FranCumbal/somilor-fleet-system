@@ -81,3 +81,9 @@ export const checklistAPI = {
 export const dashboardAPI = {
   kpis: () => api.get('/dashboard/kpis'),
 }
+
+export const asignacionesAPI = {
+  list: (params) => api.get('/asignaciones', { params }),
+  create: (data) => api.post('/asignaciones', data),
+  terminar: (id) => api.patch(`/asignaciones/${id}/terminar`),
+}

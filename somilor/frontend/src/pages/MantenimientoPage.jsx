@@ -79,7 +79,7 @@ export default function MantenimientoPage() {
   const agregarFormulario = () => {
     const formPrincipal = formularios[0]
     if (!formPrincipal.vehiculo_id) {
-      setError('⚠️ Selecciona un vehículo en el primer mantenimiento antes de agregar otro.')
+      setError('Selecciona un vehículo en el primer mantenimiento antes de agregar otro.')
       return
     }
     setError('')
@@ -158,6 +158,11 @@ export default function MantenimientoPage() {
     cargar()
   }
 
+  const iniciar = async (id) => {
+    await mantenimientoAPI.update(id, { estado:'en_proceso' })
+    cargar()
+  }
+
   const agruparProcedimientos = (tipoVehiculo, claseMantenimiento) => {
     const filtrados = catalogoDB.filter(p => p.tipo_vehiculo === tipoVehiculo && p.clase === claseMantenimiento)
     return filtrados.reduce((acc, curr) => {
@@ -200,7 +205,6 @@ export default function MantenimientoPage() {
                 </PanelHeader>
 
                 {!esEsclavo ? (
-                  // MAGIA RESPONSIVA: repeat(auto-fit, minmax(220px, 1fr)) asegura que en móvil se apilen automáticamente
                   <div style={{ padding:20, display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:16 }}>
                     <div>
                       <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Filtrar Categoría</label>
@@ -236,7 +240,6 @@ export default function MantenimientoPage() {
                     </div>
                     <div>
                       <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Kilometraje / Horas</label>
-                      {/* VALIDACIÓN NUMÉRICA */}
                       <input type="number" min="0" step="any" placeholder="Ej: 85000" value={f.km_programado} 
                         onChange={e => updateField(f.idRef, 'km_programado', e.target.value)}
                         onKeyDown={preventInvalidChars}
@@ -244,7 +247,6 @@ export default function MantenimientoPage() {
                     </div>
                     <div>
                       <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Costo Total ($)</label>
-                      {/* VALIDACIÓN NUMÉRICA */}
                       <input type="number" min="0" step="any" placeholder="0.00" value={f.costo} 
                         onChange={e => updateField(f.idRef, 'costo', e.target.value)}
                         onKeyDown={preventInvalidChars}
@@ -275,7 +277,6 @@ export default function MantenimientoPage() {
                     </div>
                   </div>
                 ) : (
-                  // MAGIA RESPONSIVA TAMBIÉN PARA EL ESCLAVO
                   <div style={{ padding:20, display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:16, background:'rgba(255,255,255,0.01)' }}>
                     <div>
                       <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Tipo de Trabajo *</label>
@@ -292,7 +293,6 @@ export default function MantenimientoPage() {
                     </div>
                     <div>
                       <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Costo Extra ($)</label>
-                      {/* VALIDACIÓN NUMÉRICA */}
                       <input type="number" min="0" step="any" placeholder="0.00" value={f.costo} 
                         onChange={e => updateField(f.idRef, 'costo', e.target.value)}
                         onKeyDown={preventInvalidChars}
@@ -404,6 +404,11 @@ export default function MantenimientoPage() {
                         <td style={{ padding:'13px 20px', borderBottom:'1px solid var(--border-soft)', whiteSpace: 'nowrap' }}><StatusPill status={m.estado} /></td>
                         <td style={{ padding:'13px 20px', borderBottom:'1px solid var(--border-soft)', whiteSpace: 'nowrap' }}>
                           <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                            {m.estado !== 'completado' && m.estado !== 'en_proceso' && (
+                              <button onClick={(e) => { e.stopPropagation(); iniciar(m.id); }} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(240,167,66,0.1)', color:'var(--amber)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }} title="Iniciar trabajo">
+                                ▶️
+                              </button>
+                            )}
                             {m.estado !== 'completado' && (
                               <button onClick={(e) => { e.stopPropagation(); completar(m.id); }} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(61,200,122,0.1)', color:'var(--green)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }} title="Marcar completado">
                                 ✓
@@ -427,9 +432,6 @@ export default function MantenimientoPage() {
         </>
       )}
 
-      {/* ========================================================= */}
-      {/* EL MODAL INTELIGENTE DE MANTENIMIENTO                     */}
-      {/* ========================================================= */}
       {detalleActivo && (
         <div onClick={() => setDetalleActivo(null)} style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(10, 12, 17, 0.85)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, animation: 'fadeInModal 0.2s ease-out', padding: '20px' }}>
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: Array.isArray(detalleActivo.data) ? '800px' : '550px', background: 'var(--panel)', borderRadius: 16, padding: '30px', border: '1px solid var(--border-soft)', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', maxHeight: '90vh', overflowY: 'auto' }}>
@@ -441,7 +443,6 @@ export default function MantenimientoPage() {
 
             <div style={{ color: 'var(--text-2)' }}>
               
-              {/* VISTA 1: Lista filtrada (Array de Mantenimientos) */}
               {Array.isArray(detalleActivo.data) && (
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', minWidth: '600px', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -475,7 +476,6 @@ export default function MantenimientoPage() {
                 </div>
               )}
 
-              {/* VISTA 2: Detalle de una sola intervención (Ficha de Mantenimiento) */}
               {!Array.isArray(detalleActivo.data) && (
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
