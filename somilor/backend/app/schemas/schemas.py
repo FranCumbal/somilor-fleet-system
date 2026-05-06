@@ -211,6 +211,7 @@ class DashboardKPIs(BaseModel):
 class PersonalBase(BaseModel):
     nombre:   str
     apellido: str
+    codigo_trabajador: Optional[str] = None
     cargo:    Optional[str] = None
     area:     Optional[str] = None
 
