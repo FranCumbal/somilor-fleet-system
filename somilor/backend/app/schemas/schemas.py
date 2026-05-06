@@ -32,7 +32,7 @@ class ChoferBase(BaseModel):
     nombre: str
     apellido: str
     cedula: str
-    licencia: Optional[str] = None
+    codigo_trabajador: Optional[str] = None 
     categoria_licencia: Optional[str] = None
     telefono: Optional[str] = None
 
@@ -206,3 +206,65 @@ class DashboardKPIs(BaseModel):
     mantenimientos_vencidos: int
     mantenimientos_proximos: int
     checklists_reprobados_hoy: int
+
+# ── PERSONAL ──────────────────────────────────────────────
+class PersonalBase(BaseModel):
+    nombre:   str
+    apellido: str
+    cargo:    Optional[str] = None
+    area:     Optional[str] = None
+
+class PersonalCreate(PersonalBase):
+    pass
+
+class PersonalOut(PersonalBase):
+    id:        int
+    activo:    bool
+    creado_en: datetime
+    class Config: from_attributes = True
+
+
+# ── GENERADOR ─────────────────────────────────────────────
+class GeneradorOut(BaseModel):
+    id:        int
+    nombre:    str
+    ubicacion: Optional[str] = None
+    marca:     Optional[str] = None
+    activo:    bool
+    class Config: from_attributes = True
+
+
+# ── PRECIO DIESEL ─────────────────────────────────────────
+class PrecioDieselCreate(BaseModel):
+    precio_galon:  float
+    fecha_inicio:  datetime
+    observaciones: Optional[str] = None
+
+class PrecioDieselOut(PrecioDieselCreate):
+    id:        int
+    creado_en: datetime
+    class Config: from_attributes = True
+
+
+# ── CONSUMO GENERADOR ─────────────────────────────────────
+class ConsumoGeneradorCreate(BaseModel):
+    generador_id:  int
+    personal_id:   Optional[int] = None
+    fecha:         datetime
+    galones:       float
+    observaciones: Optional[str] = None
+
+class ConsumoGeneradorUpdate(BaseModel):
+    generador_id:  Optional[int]   = None
+    personal_id:   Optional[int]   = None
+    fecha:         Optional[datetime] = None
+    galones:       Optional[float] = None
+    observaciones: Optional[str]   = None
+
+class ConsumoGeneradorOut(ConsumoGeneradorCreate):
+    id:              int
+    creado_en:       datetime
+    generador:       GeneradorOut
+    personal:        Optional[PersonalOut] = None
+    costo_calculado: Optional[float]       = None
+    class Config: from_attributes = True

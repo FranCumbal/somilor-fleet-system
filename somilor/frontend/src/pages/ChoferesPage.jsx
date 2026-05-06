@@ -3,7 +3,7 @@ import { choferesAPI } from '../services/api'
 import { Panel, PanelHeader, PageHeader, Btn, LoadingSpinner, EmptyState } from '../components/layout/UI'
 
 const idUnico = () => Math.random().toString(36).substr(2, 9)
-const estadoInicial = { nombre:'', apellido:'', cedula:'', licencia:'', categoria_licencia:'', telefono:'' }
+const estadoInicial = { nombre:'', apellido:'', cedula:'', codigo_trabajador:'', categoria_licencia:'', telefono:'' }
 const CATEGORIAS_LICENCIA = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'Otra']
 
 export default function ChoferesPage() {
@@ -53,6 +53,11 @@ export default function ChoferesPage() {
         setSaving(false)
         return
       }
+      if (f.codigo_trabajador && f.codigo_trabajador.length !== 4) {
+        setError(`El Código de Trabajo de ${f.nombre} debe tener exactamente 4 dígitos.`)
+        setSaving(false)
+        return
+}
     }
 
     try {
@@ -142,7 +147,7 @@ export default function ChoferesPage() {
                   { key:'nombre', label:'Nombres *', ph:'Ej: Carlos Andrés' },
                   { key:'apellido', label:'Apellidos *', ph:'Ej: Mendoza' },
                   { key:'cedula', label:'Número de Cédula *', ph:'Ej: 0912345678', isNumeric: true, maxLen: 10 },
-                  { key:'licencia', label:'Cód. de Trabajo * (4 dígitos)', ph:'Ej: 1234', isNumeric: true, maxLen: 4 },
+                  { key:'codigo_trabajador', label:'Cód. de Trabajo * (4 dígitos)', ph:'Ej: 1234', isNumeric: true, maxLen: 4 },
                   { key:'categoria_licencia', label:'Categoría de Licencia', type:'select', options: CATEGORIAS_LICENCIA },
                   { key:'telefono', label:'Teléfono de Contacto', ph:'Ej: 0991234567', isNumeric: true, maxLen: 10 },
                 ].map(campo => (
@@ -239,7 +244,7 @@ export default function ChoferesPage() {
                   </div>
                   <div style={{ borderTop:'1px solid var(--border-soft)', paddingTop:12, display:'flex', flexDirection:'column', gap:6 }}>
                     {[
-                      { label:'Código de Trabajo', val: c.licencia || '—' },
+                      { label:'Código de Trabajo', val: c.codigo_trabajador || '—' },
                       { label:'Categoría', val: c.categoria_licencia ? `Tipo ${c.categoria_licencia}` : '—' },
                       { label:'Teléfono', val: c.telefono || '—' },
                     ].map(row => (

@@ -43,7 +43,7 @@ class Chofer(Base):
     nombre = Column(String(100), nullable=False)
     apellido = Column(String(100), nullable=False)
     cedula = Column(String(20), unique=True, index=True)
-    licencia = Column(String(50))
+    codigo_trabajador = Column(String(50))
     categoria_licencia = Column(String(10))
     telefono = Column(String(20))
     activo = Column(Boolean, default=True)
@@ -159,3 +159,53 @@ class CatalogoMantenimiento(Base):
     sistema = Column(String(100), nullable=False) 
     descripcion = Column(String(255), nullable=False)
     frecuencia_estimada = Column(String(100), nullable=True)
+
+class Personal(Base):
+    __tablename__ = "personal"
+
+    id        = Column(Integer, primary_key=True, index=True)
+    nombre    = Column(String(100), nullable=False)
+    apellido  = Column(String(100), nullable=False)
+    cargo     = Column(String(100))
+    area      = Column(String(100))
+    activo    = Column(Boolean, default=True)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+
+    consumos  = relationship("ConsumoGenerador", back_populates="personal")
+
+
+class Generador(Base):
+    __tablename__ = "generadores"
+
+    id        = Column(Integer, primary_key=True, index=True)
+    nombre    = Column(String(100), nullable=False)
+    ubicacion = Column(String(150))
+    marca     = Column(String(80))
+    activo    = Column(Boolean, default=True)
+
+    consumos  = relationship("ConsumoGenerador", back_populates="generador")
+
+
+class PrecioDiesel(Base):
+    __tablename__ = "precios_diesel"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    precio_galon  = Column(Float, nullable=False)
+    fecha_inicio  = Column(DateTime(timezone=True), nullable=False)
+    observaciones = Column(Text)
+    creado_en     = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class ConsumoGenerador(Base):
+    __tablename__ = "consumos_generador"
+
+    id           = Column(Integer, primary_key=True, index=True)
+    generador_id = Column(Integer, ForeignKey("generadores.id"), nullable=False)
+    personal_id  = Column(Integer, ForeignKey("personal.id"), nullable=True)
+    fecha        = Column(DateTime(timezone=True), nullable=False)
+    galones      = Column(Float, nullable=False)
+    observaciones = Column(Text)
+    creado_en    = Column(DateTime(timezone=True), server_default=func.now())
+
+    generador = relationship("Generador", back_populates="consumos")
+    personal  = relationship("Personal", back_populates="consumos")

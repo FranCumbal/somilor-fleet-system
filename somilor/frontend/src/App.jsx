@@ -9,6 +9,8 @@ import CombustiblePage from './pages/CombustiblePage'
 import MantenimientoPage from './pages/MantenimientoPage'
 import ChecklistPage from './pages/ChecklistPage'
 import AsignacionesPage from './pages/AsignacionesPage' 
+import PersonalPage    from './pages/PersonalPage'
+import GeneracionPage  from './pages/GeneracionPage'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -33,6 +35,8 @@ function AppRoutes() {
         <Route path="combustible"    element={<CombustiblePage />} />
         <Route path="mantenimiento"  element={<MantenimientoPage />} />
         <Route path="checklist"      element={<ChecklistPage />} />
+        <Route path="personal"       element={<PersonalPage />} />
+        <Route path="generacion"     element={<GeneracionPage />} />
       </Route>
     </Routes>
   )

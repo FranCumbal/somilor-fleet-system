@@ -86,3 +86,24 @@ export const asignacionesAPI = {
   create: (data) => api.post('/asignaciones', data),
   terminar: (id) => api.patch(`/asignaciones/${id}/terminar`),
 }
+
+export const personalAPI = {
+  list:   ()         => api.get('/personal'),
+  get:    (id)       => api.get(`/personal/${id}`),
+  create: (data)     => api.post('/personal', data),
+  update: (id, data) => api.put(`/personal/${id}`, data),
+  delete: (id)       => api.delete(`/personal/${id}`),
+}
+
+export const generacionAPI = {
+  listGeneradores: ()         => api.get('/generacion/generadores'),
+  listPrecios:     ()         => api.get('/generacion/precios'),
+  precioVigente:   ()         => api.get('/generacion/precios/vigente'),
+  createPrecio:    (data)     => api.post('/generacion/precios', data),
+  deletePrecio:    (id)       => api.delete(`/generacion/precios/${id}`),
+  listConsumos:    (params)   => api.get('/generacion/consumos', { params }),
+  createConsumo:   (data)     => api.post('/generacion/consumos', data),
+  updateConsumo:   (id, data) => api.patch(`/generacion/consumos/${id}`, data),
+  deleteConsumo:   (id)       => api.delete(`/generacion/consumos/${id}`),
+  dashboard:       ()         => api.get('/generacion/dashboard'),
+}

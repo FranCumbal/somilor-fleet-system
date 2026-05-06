@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import Base, engine
-from app.routers import auth, vehiculos, choferes, combustible, mantenimiento, checklist, dashboard, asignaciones
+from app.routers import auth, vehiculos, choferes, combustible, mantenimiento, checklist, dashboard, asignaciones, personal, generacion
 
 Base.metadata.create_all(bind=engine)
 
@@ -28,7 +28,9 @@ app.include_router(combustible.router, prefix=PREFIX)
 app.include_router(mantenimiento.router, prefix=PREFIX)
 app.include_router(checklist.router, prefix=PREFIX)
 app.include_router(dashboard.router, prefix=PREFIX)
-app.include_router(asignaciones.router, prefix=PREFIX) # <--- AGREGADO
+app.include_router(asignaciones.router, prefix=PREFIX)
+app.include_router(personal.router,    prefix=PREFIX)
+app.include_router(generacion.router,  prefix=PREFIX)
 
 @app.get("/")
 def root():

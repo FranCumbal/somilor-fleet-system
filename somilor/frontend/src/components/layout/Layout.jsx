@@ -14,6 +14,8 @@ const navItems = [
   { to: '/combustible',   icon: '⛽', label: 'Combustible' },
   { to: '/mantenimiento', icon: '🔧', label: 'Mantenimiento' },
   { to: '/checklist',     icon: '✅', label: 'Checklist' },
+  { to: '/personal',      icon: '👥', label: 'Personal' },
+  { to: '/generacion',    icon: '⚡', label: 'Generación' },
 ]
 
 // Iconos SVG limpios para la interfaz

@@ -1,1 +1,1 @@
-from app.routers import vehiculos, choferes, combustible, mantenimiento, checklist, dashboard, auth, asignaciones
+from app.routers import vehiculos, choferes, combustible, mantenimiento, checklist, dashboard, auth, asignaciones, personal, generacion
