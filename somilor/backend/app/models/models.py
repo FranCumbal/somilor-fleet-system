@@ -166,6 +166,7 @@ class Personal(Base):
     id        = Column(Integer, primary_key=True, index=True)
     nombre    = Column(String(100), nullable=False)
     apellido  = Column(String(100), nullable=False)
+    codigo_trabajador = Column(String(20), nullable=True)
     cargo     = Column(String(100))
     area      = Column(String(100))
     activo    = Column(Boolean, default=True)

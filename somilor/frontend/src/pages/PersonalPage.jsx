@@ -3,7 +3,7 @@ import { personalAPI } from '../services/api'
 import { Panel, PanelHeader, PageHeader, Btn, LoadingSpinner, EmptyState } from '../components/layout/UI'
 
 const idUnico = () => Math.random().toString(36).substr(2, 9)
-const estadoInicial = { nombre: '', apellido: '', cargo: '', area: '' }
+const estadoInicial = { nombre: '', apellido: '', codigo_trabajador: '', cargo: '', area: '' }  
 
 export default function PersonalPage() {
   const [personal, setPersonal]     = useState([])
@@ -66,11 +66,12 @@ export default function PersonalPage() {
   const cargarDatosEdicion = (p) => {
     setEditandoId(p.id)
     setFormularios([{
-      idRef:    idUnico(),
-      nombre:   p.nombre   || '',
-      apellido: p.apellido || '',
-      cargo:    p.cargo    || '',
-      area:     p.area     || '',
+      idRef:             idUnico(),
+      nombre:            p.nombre            || '',
+      apellido:          p.apellido          || '',
+      codigo_trabajador: p.codigo_trabajador || '',
+      cargo:             p.cargo             || '',
+      area:              p.area              || '',
     }])
     setShowForm(true)
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -129,10 +130,11 @@ export default function PersonalPage() {
               </PanelHeader>
               <div style={{ padding: 20, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
                 {[
-                  { key: 'nombre',   label: 'Nombres *',   ph: 'Ej: Juan Carlos' },
-                  { key: 'apellido', label: 'Apellidos *',  ph: 'Ej: Pérez' },
-                  { key: 'cargo',    label: 'Cargo',        ph: 'Ej: Operador de planta' },
-                  { key: 'area',     label: 'Área',         ph: 'Ej: Generación' },
+                  { key: 'nombre',            label: 'Nombres *',          ph: 'Ej: Juan Carlos' },
+                  { key: 'apellido',          label: 'Apellidos *',         ph: 'Ej: Pérez' },
+                  { key: 'codigo_trabajador', label: 'Código de trabajo',   ph: 'Ej: 1234' },
+                  { key: 'cargo',             label: 'Cargo',               ph: 'Ej: Operador de planta' },
+                  { key: 'area',              label: 'Área',                ph: 'Ej: Generación' },
                 ].map(campo => (
                   <div key={campo.key}>
                     <label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>{campo.label}</label>
@@ -274,6 +276,7 @@ export default function PersonalPage() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13, color: 'var(--text-2)', padding: 15, background: 'var(--panel2)', borderRadius: 8 }}>
+                  <div><strong style={{ color: '#fff' }}>Código de trabajo:</strong><span style={{ float: 'right', fontFamily: 'Space Mono', color: 'var(--gold-light)' }}>{detalleActivo.data.codigo_trabajador || 'No registrado'}</span></div>
                   <div><strong style={{ color: '#fff' }}>Cargo:</strong><span style={{ float: 'right' }}>{detalleActivo.data.cargo || 'No registrado'}</span></div>
                   <div><strong style={{ color: '#fff' }}>Área:</strong><span style={{ float: 'right', color: 'var(--blue)' }}>{detalleActivo.data.area || 'No registrado'}</span></div>
                   <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border-soft)' }}>
