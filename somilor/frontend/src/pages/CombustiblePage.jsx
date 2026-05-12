@@ -5,48 +5,121 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 
 const idUnico = () => Math.random().toString(36).substr(2, 9)
 const getLocalNow = () => new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)
-const estadoInicial = { vehiculo_id:'', chofer_id:'', costo_total:'', fecha: '', observaciones:'' }
+const estadoInicial = { vehiculo_id:'', chofer_id:'', costo_total:'', fecha:'', observaciones:'' }
+
 const preventInvalidChars = (e) => {
-  if (['e', 'E', '+', '-'].includes(e.key)) {
-    e.preventDefault()
-  }
+  if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault()
 }
 
 export default function CombustiblePage() {
-  const [tanqueos, setTanqueos] = useState([])
-  const [vehiculos, setVehiculos] = useState([])
-  const [choferes, setChoferes] = useState([])
-  const [loading, setLoading] = useState(true)
-  
-  const [showForm, setShowForm] = useState(false)
+  const [tanqueos, setTanqueos]     = useState([])
+  const [vehiculos, setVehiculos]   = useState([])
+  const [choferes, setChoferes]     = useState([])
+  const [loading, setLoading]       = useState(true)
+  const [showForm, setShowForm]     = useState(false)
   const [formularios, setFormularios] = useState([{ idRef: idUnico(), ...estadoInicial, fecha: getLocalNow() }])
   const [editandoId, setEditandoId] = useState(null)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
+  const [saving, setSaving]         = useState(false)
+  const [error, setError]           = useState('')
   const [detalleActivo, setDetalleActivo] = useState(null)
-
-  // Estado para el filtro de tiempo
   const [periodoActivo, setPeriodoActivo] = useState('mes')
+  const [busqueda, setBusqueda]     = useState('')
+  const [pagina, setPagina]         = useState(1)
+  const POR_PAGINA                  = 15
 
   const cargar = () => {
     setLoading(true)
     Promise.all([
-      combustibleAPI.list({ limit: 100 }), 
+      combustibleAPI.list({ limit: 500 }),
       vehiculosAPI.list(),
       choferesAPI.list(),
     ]).then(([t, v, c]) => {
-      setVehiculos(v.data); 
-      setChoferes(c.data);
-      const tanqueosCompletos = t.data.map(tanqueo => ({
+      setVehiculos(v.data); setChoferes(c.data)
+      const completos = t.data.map(tanqueo => ({
         ...tanqueo,
         vehiculo: v.data.find(veh => veh.id === tanqueo.vehiculo_id),
-        chofer: c.data.find(chof => chof.id === tanqueo.chofer_id)
+        chofer:   c.data.find(chof => chof.id === tanqueo.chofer_id)
       }))
-      setTanqueos(tanqueosCompletos);
+      setTanqueos(completos)
     }).catch(() => {}).finally(() => setLoading(false))
   }
 
   useEffect(() => { cargar() }, [])
+  useEffect(() => { setPagina(1) }, [periodoActivo, busqueda])
+
+  const getFechaInicio = () => {
+    const d = new Date(); d.setHours(0, 0, 0, 0)
+    switch (periodoActivo) {
+      case 'hoy':    return d
+      case 'semana': {
+        const day = d.getDay()
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+        return new Date(new Date(d).setDate(diff))
+      }
+      case 'mes':  return new Date(d.getFullYear(), d.getMonth(), 1)
+      case 'ano':  return new Date(d.getFullYear(), 0, 1)
+      default:     return new Date(0)
+    }
+  }
+
+  const tanqueosFiltrados = tanqueos.filter(t => new Date(t.fecha) >= getFechaInicio())
+
+  const tanqueosConBusqueda = tanqueosFiltrados.filter(t => {
+    if (!busqueda.trim()) return true
+    const q = busqueda.toLowerCase()
+    return (
+      (t.vehiculo?.placa  || '').toLowerCase().includes(q) ||
+      (t.vehiculo?.marca  || '').toLowerCase().includes(q) ||
+      (t.vehiculo?.modelo || '').toLowerCase().includes(q) ||
+      (t.chofer?.nombre   || '').toLowerCase().includes(q) ||
+      (t.chofer?.apellido || '').toLowerCase().includes(q) ||
+      (t.observaciones    || '').toLowerCase().includes(q) ||
+      (t.costo_total?.toString() || '').includes(q)
+    )
+  })
+
+  const totalPaginas   = Math.max(1, Math.ceil(tanqueosConBusqueda.length / POR_PAGINA))
+  const tanqueosPagina = tanqueosConBusqueda.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA)
+
+  const inversionPeriodo    = tanqueosFiltrados.reduce((acc, t) => acc + (t.costo_total || 0), 0)
+  const totalTanqueosPeriodo = tanqueosFiltrados.length
+
+  const getLabelInversion = () => {
+    switch(periodoActivo) {
+      case 'hoy':   return 'Inversión de Hoy'
+      case 'semana': return 'Inversión Semanal'
+      case 'mes':   return 'Inversión Mensual'
+      case 'ano':   return 'Inversión Anual'
+      default:      return 'Inversión Histórica'
+    }
+  }
+
+  let chartData = []
+  if (periodoActivo === 'hoy') {
+    const obj = {}
+    tanqueosFiltrados.forEach(t => {
+      const hora = new Date(t.fecha).toLocaleTimeString('es-EC', { hour:'2-digit', minute:'2-digit' })
+      obj[hora] = (obj[hora] || 0) + (t.costo_total || 0)
+    })
+    chartData = Object.keys(obj).sort().map(hora => ({ dia:hora, costo:obj[hora] })).slice(-15)
+  } else {
+    const obj = {}
+    tanqueosFiltrados.forEach(t => {
+      const dia = new Date(t.fecha).toLocaleDateString('es-EC', { day:'2-digit', month:'short' })
+      obj[dia] = (obj[dia] || 0) + (t.costo_total || 0)
+    })
+    chartData = Object.keys(obj).map(dia => ({ dia, costo:obj[dia] })).slice(0, 15).reverse()
+  }
+
+  const handleChartClick = (state) => {
+    if (state?.activePayload) {
+      const val = state.activePayload[0].payload.dia
+      const datos = periodoActivo === 'hoy'
+        ? tanqueosFiltrados.filter(t => new Date(t.fecha).toLocaleTimeString('es-EC', { hour:'2-digit', minute:'2-digit' }) === val)
+        : tanqueosFiltrados.filter(t => new Date(t.fecha).toLocaleDateString('es-EC', { day:'2-digit', month:'short' }) === val)
+      setDetalleActivo({ tipo:`Registros de: ${val}`, data:datos })
+    }
+  }
 
   const updateField = (idRef, field, value) => {
     setFormularios(prev => prev.map(f => f.idRef === idRef ? { ...f, [field]: value } : f))
@@ -57,41 +130,32 @@ export default function CombustiblePage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault(); setSaving(true); setError('')
-
-    // VALIDACIÓN ESTRICTA: El costo debe ser mayor a 0
     for (const f of formularios) {
       if (!f.costo_total || parseFloat(f.costo_total) <= 0) {
-        setError(`El costo total debe ser un valor mayor a $0.00. Revisa el formulario.`)
-        setSaving(false)
-        return
+        setError('El costo total debe ser un valor mayor a $0.00.')
+        setSaving(false); return
       }
     }
-
     try {
       if (editandoId) {
         const f = formularios[0]
-        const payload = {
-          vehiculo_id: parseInt(f.vehiculo_id),
-          chofer_id: f.chofer_id ? parseInt(f.chofer_id) : null,
-          costo_total: parseFloat(f.costo_total),
-          fecha: f.fecha ? new Date(f.fecha).toISOString() : null,
+        await combustibleAPI.update(editandoId, {
+          vehiculo_id:   parseInt(f.vehiculo_id),
+          chofer_id:     f.chofer_id ? parseInt(f.chofer_id) : null,
+          costo_total:   parseFloat(f.costo_total),
+          fecha:         f.fecha ? new Date(f.fecha).toISOString() : null,
           observaciones: f.observaciones || null,
-        }
-        await combustibleAPI.update(editandoId, payload)
-      } else {
-        const promesas = formularios.map(f => {
-          return combustibleAPI.create({
-            vehiculo_id: parseInt(f.vehiculo_id),
-            chofer_id: f.chofer_id ? parseInt(f.chofer_id) : null,
-            costo_total: parseFloat(f.costo_total),
-            fecha: f.fecha ? new Date(f.fecha).toISOString() : null,
-            observaciones: f.observaciones || null,
-          })
         })
-        await Promise.all(promesas)
+      } else {
+        await Promise.all(formularios.map(f => combustibleAPI.create({
+          vehiculo_id:   parseInt(f.vehiculo_id),
+          chofer_id:     f.chofer_id ? parseInt(f.chofer_id) : null,
+          costo_total:   parseFloat(f.costo_total),
+          fecha:         f.fecha ? new Date(f.fecha).toISOString() : null,
+          observaciones: f.observaciones || null,
+        })))
       }
-      cerrarFormulario()
-      cargar()
+      cerrarFormulario(); cargar()
     } catch (err) { setError(err.response?.data?.detail || 'Error al guardar los registros') }
     finally { setSaving(false) }
   }
@@ -99,117 +163,78 @@ export default function CombustiblePage() {
   const cargarDatosEdicion = (t) => {
     setEditandoId(t.id)
     setFormularios([{
-      idRef: idUnico(),
-      vehiculo_id: t.vehiculo_id || '',
-      chofer_id: t.chofer_id || '',
-      costo_total: t.costo_total || '',
-      fecha: t.fecha ? new Date(new Date(t.fecha).getTime() - new Date(t.fecha).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : getLocalNow(),
+      idRef:         idUnico(),
+      vehiculo_id:   t.vehiculo_id  || '',
+      chofer_id:     t.chofer_id    || '',
+      costo_total:   t.costo_total  || '',
+      fecha:         t.fecha ? new Date(new Date(t.fecha).getTime() - new Date(t.fecha).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : getLocalNow(),
       observaciones: t.observaciones || ''
     }])
     setShowForm(true)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    window.scrollTo({ top:0, behavior:'smooth' })
   }
 
   const cerrarFormulario = () => {
-    setShowForm(false); setEditandoId(null); setFormularios([{ idRef: idUnico(), ...estadoInicial, fecha: getLocalNow() }]); setError('')
+    setShowForm(false); setEditandoId(null)
+    setFormularios([{ idRef: idUnico(), ...estadoInicial, fecha: getLocalNow() }]); setError('')
   }
 
   const eliminarTanqueo = async (id) => {
-    if (window.confirm(`¿Estás seguro de eliminar este registro financiero?`)) {
-      try { await combustibleAPI.delete(id); cargar() } catch (err) { alert('Error al eliminar') }
+    if (window.confirm('¿Estás seguro de eliminar este registro financiero?')) {
+      try { await combustibleAPI.delete(id); cargar() }
+      catch { alert('Error al eliminar') }
     }
   }
 
-  // --- LÓGICA DE FILTRADO POR FECHAS ---
-  const getFechaInicio = () => {
-    const d = new Date()
-    d.setHours(0, 0, 0, 0)
-    switch (periodoActivo) {
-      case 'hoy': 
-        return d
-      case 'semana': {
-        const day = d.getDay()
-        const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-        return new Date(d.setDate(diff))
-      }
-      case 'mes': 
-        return new Date(d.getFullYear(), d.getMonth(), 1)
-      case 'ano': 
-        return new Date(d.getFullYear(), 0, 1)
-      default: 
-        return new Date(0) // 'todo'
-    }
-  }
-
-  const fechaInicioFiltro = getFechaInicio()
-
-  // Filtrar los datos en base a la fecha calculada
-  const tanqueosFiltrados = tanqueos.filter(t => new Date(t.fecha) >= fechaInicioFiltro)
-
-  // --- CÁLCULOS DINÁMICOS PARA KPIs ---
-  const inversionPeriodo = tanqueosFiltrados.reduce((acc, t) => acc + (t.costo_total || 0), 0)
-  const totalTanqueosPeriodo = tanqueosFiltrados.length
-  
-  const getLabelInversion = () => {
-    switch(periodoActivo) {
-      case 'hoy': return 'Inversión de Hoy'
-      case 'semana': return 'Inversión Semanal'
-      case 'mes': return 'Inversión Mensual'
-      case 'ano': return 'Inversión Anual'
-      default: return 'Inversión Histórica'
-    }
-  }
-
-  // --- CONSTRUCCIÓN DE LA GRÁFICA DINÁMICA ---
-  let chartData = []
-  if (periodoActivo === 'hoy') {
-    const chartHorasObj = {}
-    tanqueosFiltrados.forEach(t => {
-      const hora = new Date(t.fecha).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })
-      chartHorasObj[hora] = (chartHorasObj[hora] || 0) + (t.costo_total || 0)
-    })
-    // Ordenar horas cronológicamente
-    chartData = Object.keys(chartHorasObj).sort().map(hora => ({ dia: hora, costo: chartHorasObj[hora] })).slice(-15)
-  } else {
-    const chartDataObj = {}
-    tanqueosFiltrados.forEach(t => {
-      const dia = new Date(t.fecha).toLocaleDateString('es-EC', { day: '2-digit', month: 'short' })
-      chartDataObj[dia] = (chartDataObj[dia] || 0) + (t.costo_total || 0)
-    })
-    // Invertir para mostrar lo antiguo a la izquierda y lo más reciente a la derecha
-    chartData = Object.keys(chartDataObj).map(dia => ({ dia, costo: chartDataObj[dia] })).slice(0, 15).reverse()
-  }
-
-  const handleChartClick = (state) => {
-    if (state && state.activePayload) {
-      const valorSeleccionado = state.activePayload[0].payload.dia
-      let datosDia = []
-      
-      // La lógica del modal también se adapta si filtramos por horas o días
-      if (periodoActivo === 'hoy') {
-        datosDia = tanqueosFiltrados.filter(t => new Date(t.fecha).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' }) === valorSeleccionado)
-      } else {
-        datosDia = tanqueosFiltrados.filter(t => new Date(t.fecha).toLocaleDateString('es-EC', { day: '2-digit', month: 'short' }) === valorSeleccionado)
-      }
-      setDetalleActivo({ tipo: `Registros de: ${valorSeleccionado}`, data: datosDia })
-    }
-  }
+  const Paginacion = () => totalPaginas > 1 ? (
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 20px', borderTop:'1px solid var(--border-soft)' }}>
+      <span style={{ fontSize:12, color:'var(--text-3)' }}>
+        Página {pagina} de {totalPaginas} · {tanqueosConBusqueda.length} registros
+      </span>
+      <div style={{ display:'flex', gap:6 }}>
+        <button onClick={() => setPagina(1)} disabled={pagina === 1}
+          style={{ fontSize:12, padding:'5px 10px', borderRadius:6, background:'var(--panel2)', border:'1px solid var(--border-soft)', color:pagina === 1 ? 'var(--text-3)' : 'var(--text-1)', cursor:pagina === 1 ? 'default' : 'pointer' }}>«</button>
+        <button onClick={() => setPagina(p => Math.max(1, p - 1))} disabled={pagina === 1}
+          style={{ fontSize:12, padding:'5px 10px', borderRadius:6, background:'var(--panel2)', border:'1px solid var(--border-soft)', color:pagina === 1 ? 'var(--text-3)' : 'var(--text-1)', cursor:pagina === 1 ? 'default' : 'pointer' }}>‹</button>
+        {Array.from({ length: totalPaginas }, (_, i) => i + 1)
+          .filter(n => n === 1 || n === totalPaginas || Math.abs(n - pagina) <= 1)
+          .reduce((acc, n, idx, arr) => {
+            if (idx > 0 && n - arr[idx - 1] > 1) acc.push('...')
+            acc.push(n); return acc
+          }, [])
+          .map((item, idx) =>
+            item === '...'
+              ? <span key={`e${idx}`} style={{ fontSize:12, padding:'5px 4px', color:'var(--text-3)' }}>…</span>
+              : <button key={item} onClick={() => setPagina(item)}
+                  style={{ fontSize:12, padding:'5px 10px', borderRadius:6, border:'1px solid var(--border-soft)', cursor:'pointer', background:pagina === item ? 'var(--gold)' : 'var(--panel2)', color:pagina === item ? '#0E1117' : 'var(--text-1)', fontWeight:pagina === item ? 700 : 400 }}>
+                  {item}
+                </button>
+          )
+        }
+        <button onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))} disabled={pagina === totalPaginas}
+          style={{ fontSize:12, padding:'5px 10px', borderRadius:6, background:'var(--panel2)', border:'1px solid var(--border-soft)', color:pagina === totalPaginas ? 'var(--text-3)' : 'var(--text-1)', cursor:pagina === totalPaginas ? 'default' : 'pointer' }}>›</button>
+        <button onClick={() => setPagina(totalPaginas)} disabled={pagina === totalPaginas}
+          style={{ fontSize:12, padding:'5px 10px', borderRadius:6, background:'var(--panel2)', border:'1px solid var(--border-soft)', color:pagina === totalPaginas ? 'var(--text-3)' : 'var(--text-1)', cursor:pagina === totalPaginas ? 'default' : 'pointer' }}>»</button>
+      </div>
+    </div>
+  ) : null
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:20, minWidth: 0, width: '100%', position: 'relative' }}>
+    <div style={{ display:'flex', flexDirection:'column', gap:20, minWidth:0, width:'100%', position:'relative' }}>
       <PageHeader title="Control Financiero de Flota" subtitle="Registro de gastos por abastecimiento">
-        <Btn variant={showForm ? "ghost" : "primary"} onClick={() => { cerrarFormulario(); setShowForm(!showForm); }}>
+        <Btn variant={showForm ? 'ghost' : 'primary'} onClick={() => { cerrarFormulario(); setShowForm(!showForm) }}>
           {showForm ? 'Volver al panel' : '+ Registrar Gasto'}
         </Btn>
       </PageHeader>
 
       {showForm ? (
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:16 }}>
           {formularios.map((f, index) => (
             <Panel key={f.idRef}>
-              <PanelHeader title={editandoId ? "Editar registro" : `Factura #${index + 1}`}>
+              <PanelHeader title={editandoId ? 'Editar registro' : `Factura #${index + 1}`}>
                 {!editandoId && formularios.length > 1 && (
-                  <button type="button" onClick={() => removerFormulario(f.idRef)} style={{ fontSize:12, padding:'4px 12px', borderRadius:6, background:'rgba(224,82,82,0.1)', color:'var(--red)', border:'none', cursor:'pointer', fontWeight:600, fontFamily:'DM Sans' }}>
+                  <button type="button" onClick={() => removerFormulario(f.idRef)}
+                    style={{ fontSize:12, padding:'4px 12px', borderRadius:6, background:'rgba(224,82,82,0.1)', color:'var(--red)', border:'none', cursor:'pointer', fontWeight:600, fontFamily:'DM Sans' }}>
                     🗑️ Quitar
                   </button>
                 )}
@@ -220,7 +245,7 @@ export default function CombustiblePage() {
                   <select value={f.vehiculo_id} onChange={e => updateField(f.idRef, 'vehiculo_id', e.target.value)} required
                     style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none' }}>
                     <option value="">Seleccionar...</option>
-                    {vehiculos.map(v => <option key={v.id} value={v.id}>{v.placa || v.codigo} — {v.marca} {v.modelo}</option>)}
+                    {vehiculos.map(v => <option key={v.id} value={v.id}>{v.placa} — {v.marca} {v.modelo}</option>)}
                   </select>
                 </div>
                 <div>
@@ -231,32 +256,21 @@ export default function CombustiblePage() {
                     {choferes.map(c => <option key={c.id} value={c.id}>{c.nombre} {c.apellido}</option>)}
                   </select>
                 </div>
-                
                 <div>
                   <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Fecha y Hora del Consumo *</label>
                   <input type="datetime-local" value={f.fecha}
                     onChange={e => updateField(f.idRef, 'fecha', e.target.value)} required
-                    style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none', fontFamily:'DM Sans' }}
-                  />
+                    style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none', fontFamily:'DM Sans' }} />
                 </div>
-                
                 <div>
                   <label style={{ fontSize:12, color:'var(--gold)', display:'block', marginBottom:6, fontWeight:700 }}>Costo Total ($) *</label>
-                  <input 
-                    type="number" 
-                    min="0.01" 
-                    step="any" 
-                    placeholder="Ej: 45.50" 
-                    value={f.costo_total}
-                    onChange={e => updateField(f.idRef, 'costo_total', e.target.value)} 
-                    onKeyDown={preventInvalidChars}
-                    required
-                    style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--gold-dim)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none' }}
-                  />
+                  <input type="number" min="0.01" step="any" placeholder="Ej: 45.50"
+                    value={f.costo_total} onChange={e => updateField(f.idRef, 'costo_total', e.target.value)}
+                    onKeyDown={preventInvalidChars} required
+                    style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--gold-dim)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none' }} />
                 </div>
-                
                 <div style={{ gridColumn:'1/-1' }}>
-                  <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Observaciones (No. Factura, Estación de servicio, etc.)</label>
+                  <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Observaciones</label>
                   <textarea value={f.observaciones} onChange={e => updateField(f.idRef, 'observaciones', e.target.value)} rows={2}
                     style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none', resize:'vertical', fontFamily:'DM Sans' }} />
                 </div>
@@ -265,32 +279,35 @@ export default function CombustiblePage() {
           ))}
 
           {!editandoId && (
-            <div onClick={agregarFormulario} style={{ border:'2px dashed var(--border)', borderRadius:12, padding:'20px', textAlign:'center', cursor:'pointer', color:'var(--gold-dim)', fontWeight:600, fontSize:14, background:'rgba(200,168,75,0.03)', transition:'all 0.2s ease' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(200,168,75,0.08)'} onMouseLeave={e => e.currentTarget.style.background = 'rgba(200,168,75,0.03)'}>
+            <div onClick={agregarFormulario}
+              style={{ border:'2px dashed var(--border)', borderRadius:12, padding:'20px', textAlign:'center', cursor:'pointer', color:'var(--gold-dim)', fontWeight:600, fontSize:14, background:'rgba(200,168,75,0.03)', transition:'all 0.2s ease' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(200,168,75,0.08)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(200,168,75,0.03)'}>
               ➕ Agregar otro registro a la lista
             </div>
           )}
 
           {error && <div style={{ color:'var(--red)', fontSize:13, background:'rgba(224,82,82,0.1)', padding:'12px 16px', borderRadius:8, fontWeight:500 }}>{error}</div>}
-          
+
           <div style={{ display:'flex', justifyContent:'flex-end', gap:12, marginTop:8 }}>
             <Btn variant="ghost" onClick={cerrarFormulario} type="button">Cancelar</Btn>
-            <button type="submit" disabled={saving} style={{ padding:'10px 24px', borderRadius:8, background:'var(--gold)', color:'#0E1117', border:'none', fontWeight:600, cursor:'pointer', fontSize:14 }}>
-              {saving ? 'Guardando...' : (editandoId ? 'Actualizar registro' : `Guardar ${formularios.length} registro(s)`)}
+            <button type="submit" disabled={saving}
+              style={{ padding:'10px 24px', borderRadius:8, background:'var(--gold)', color:'#0E1117', border:'none', fontWeight:600, cursor:'pointer', fontSize:14 }}>
+              {saving ? 'Guardando...' : editandoId ? 'Actualizar registro' : `Guardar ${formularios.length} registro(s)`}
             </button>
           </div>
         </form>
       ) : (
         <>
-          {/* Controles de Filtro de Tiempo */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '5px' }}>
-            <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Filtrar período:</span>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:'5px' }}>
+            <span style={{ fontSize:11, color:'var(--text-3)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.1em' }}>Filtrar período:</span>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
               {[
-                { id: 'hoy', label: 'Hoy' },
-                { id: 'semana', label: 'Esta Semana' },
-                { id: 'mes', label: 'Este Mes' },
-                { id: 'ano', label: 'Este Año' },
-                { id: 'todo', label: 'Histórico' }
+                { id:'hoy',    label:'Hoy' },
+                { id:'semana', label:'Esta Semana' },
+                { id:'mes',    label:'Este Mes' },
+                { id:'ano',    label:'Este Año' },
+                { id:'todo',   label:'Histórico' },
               ].map(opt => (
                 <Chip key={opt.id} active={periodoActivo === opt.id} onClick={() => setPeriodoActivo(opt.id)}>
                   {opt.label}
@@ -299,47 +316,36 @@ export default function CombustiblePage() {
             </div>
           </div>
 
-          {/* KPIs DINÁMICOS REDUCIDOS A 2 COLUMNAS */}
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:14 }}>
             {[
-              { 
-                label: getLabelInversion(), 
-                value: `$${inversionPeriodo.toFixed(2)}`, 
-                accent:'var(--gold)', 
-                data: tanqueosFiltrados 
-              },
-              { 
-                label:'Tanqueos Registrados', 
-                value: totalTanqueosPeriodo, 
-                accent:'var(--blue)', 
-                data: tanqueosFiltrados 
-              },
+              { label:getLabelInversion(),    value:`$${inversionPeriodo.toFixed(2)}`, accent:'var(--gold)',  data:tanqueosFiltrados },
+              { label:'Tanqueos Registrados', value:totalTanqueosPeriodo,              accent:'var(--blue)',  data:tanqueosFiltrados },
             ].map(k => (
-              <div key={k.label} 
-                   onClick={() => setDetalleActivo({ tipo: k.label, data: k.data })}
-                   style={{ background:'var(--panel)', border:'1px solid var(--border-soft)', borderRadius:12, padding:'18px 20px', position:'relative', overflow:'hidden', cursor: 'pointer', transition: 'transform 0.2s' }}
-                   onMouseOver={e => e.currentTarget.style.transform='translateY(-3px)'} 
-                   onMouseOut={e => e.currentTarget.style.transform='translateY(0)'}>
+              <div key={k.label}
+                onClick={() => setDetalleActivo({ tipo:k.label, data:k.data })}
+                style={{ background:'var(--panel)', border:'1px solid var(--border-soft)', borderRadius:12, padding:'18px 20px', position:'relative', overflow:'hidden', cursor:'pointer', transition:'transform 0.2s' }}
+                onMouseOver={e => e.currentTarget.style.transform = 'translateY(-3px)'}
+                onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}>
                 <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background:k.accent, opacity:0.7 }} />
                 <div style={{ fontSize:11, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:8 }}>{k.label}</div>
-                <div style={{ fontSize:26, fontWeight:600, fontFamily:'Space Mono', color: 'var(--text-1)' }}>{k.value}</div>
+                <div style={{ fontSize:26, fontWeight:600, fontFamily:'Space Mono', color:'var(--text-1)' }}>{k.value}</div>
               </div>
             ))}
           </div>
 
-          <Panel style={{ maxWidth: '100%', overflow: 'hidden' }}>
+          <Panel style={{ maxWidth:'100%', overflow:'hidden' }}>
             <PanelHeader title={`Evolución del Gasto (USD) — ${periodoActivo === 'hoy' ? 'Horas' : 'Días'} ➔`} />
             <div style={{ padding:'20px 20px 10px' }}>
               {chartData.length === 0 ? (
-                 <div style={{ display: 'flex', height: 180, alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Sin datos suficientes en este período</div>
+                <div style={{ display:'flex', height:180, alignItems:'center', justifyContent:'center', color:'var(--text-3)' }}>Sin datos suficientes en este período</div>
               ) : (
                 <ResponsiveContainer width="100%" height={180}>
                   <BarChart data={chartData} margin={{ top:10, right:10, left:-20, bottom:0 }} onClick={handleChartClick}>
                     <XAxis dataKey="dia" tick={{ fill:'var(--text-3)', fontSize:11 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill:'var(--text-3)', fontSize:11 }} axisLine={false} tickLine={false} tickFormatter={val => `$${val}`} />
-                    <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{ background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, fontSize:12 }} itemStyle={{ color:'var(--gold-light)' }} formatter={(value) => [`$${value.toFixed(2)}`, 'Inversión']} />
+                    <Tooltip cursor={{ fill:'rgba(255,255,255,0.05)' }} contentStyle={{ background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, fontSize:12 }} itemStyle={{ color:'var(--gold-light)' }} formatter={value => [`$${value.toFixed(2)}`, 'Inversión']} />
                     <Bar dataKey="costo" radius={[4,4,0,0]} cursor="pointer">
-                      {chartData.map((entry, i) => <Cell key={i} fill={i === chartData.length-1 ? 'var(--gold)' : 'rgba(200,168,75,0.4)'} />)}
+                      {chartData.map((_, i) => <Cell key={i} fill={i === chartData.length-1 ? 'var(--gold)' : 'rgba(200,168,75,0.4)'} />)}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -347,129 +353,134 @@ export default function CombustiblePage() {
             </div>
           </Panel>
 
-          <Panel style={{ maxWidth: '100%', overflow: 'hidden' }}>
-            <PanelHeader title={`Historial Financiero — ${periodoActivo}`} />
-            {loading ? <LoadingSpinner /> : tanqueosFiltrados.length === 0 ? <EmptyState message="Sin registros financieros en este período" /> : (
-              <div className="table-responsive-container" style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '8px' }}>
-                <table style={{ width:'100%', borderCollapse:'collapse', minWidth: '700px' }}>
-                  <thead>
-                    <tr>
-                      {['Fecha','Unidad','Chofer Responsable','Inversión ($)','Acciones'].map(h => (
-                        <th key={h} style={{ padding:'10px 20px', textAlign:'left', fontSize:10, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.12em', color:'var(--text-3)', borderBottom:'1px solid var(--border-soft)', background:'var(--panel2)', whiteSpace:'nowrap' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tanqueosFiltrados.map(t => (
-                      <tr key={t.id} 
-                          onClick={() => setDetalleActivo({ tipo: 'Factura Detallada', data: t })}
-                          onMouseEnter={e => e.currentTarget.style.background='var(--panel2)'} 
-                          onMouseLeave={e => e.currentTarget.style.background='transparent'} 
-                          style={{ transition:'background 0.15s', cursor: 'pointer' }}>
-                        <td style={{ padding:'13px 20px', fontSize:11, fontFamily:'Space Mono', color:'var(--text-3)', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>
-                          {new Date(t.fecha).toLocaleString('es-EC', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })}
-                        </td>
-                        <td style={{ padding:'13px 20px', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>
-                          <div style={{ fontFamily:'Space Mono', fontSize:12, color:'var(--gold-light)', fontWeight:700 }}>
-                            {t.vehiculo?.placa || t.vehiculo?.codigo || `V-${t.vehiculo_id}`}
-                          </div>
-                          {t.vehiculo?.marca && <div style={{ fontSize:10, color:'var(--text-3)' }}>{t.vehiculo.marca} {t.vehiculo.modelo}</div>}
-                        </td>
-                        <td style={{ padding:'13px 20px', fontSize:13, color:'var(--text-2)', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>
-                          {t.chofer ? `${t.chofer.nombre} ${t.chofer.apellido}` : '—'}
-                        </td>
-                        <td style={{ padding:'13px 20px', fontSize:14, fontWeight:700, fontFamily:'Space Mono', color:'var(--gold-light)', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>
-                          ${(t.costo_total || 0).toFixed(2)}
-                        </td>
-                        <td style={{ padding:'13px 20px', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>
-                          <div style={{ display:'flex', gap:8 }}>
-                            <button onClick={(e) => { e.stopPropagation(); cargarDatosEdicion(t); }} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(77,156,240,0.1)', color:'var(--blue)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }} title="Editar">✏️</button>
-                            <button onClick={(e) => { e.stopPropagation(); eliminarTanqueo(t.id); }} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(224,82,82,0.1)', color:'var(--red)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }} title="Eliminar">🗑️</button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </Panel>
-        </>
-      )}
+          <Panel style={{ maxWidth:'100%', overflow:'hidden' }}>
+            <PanelHeader title={`Historial Financiero — ${periodoActivo}`}>
+              <input type="text" placeholder="Buscar..." value={busqueda}
+                onChange={e => setBusqueda(e.target.value)}
+                style={{ background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'5px 12px', color:'var(--text-1)', fontSize:12, outline:'none', width:160, fontFamily:'DM Sans' }}
+              />
+            </PanelHeader>
 
-      {/* ========================================================= */}
-      {/* EL MODAL INTELIGENTE FINANCIERO                           */}
-      {/* ========================================================= */}
-      {detalleActivo && (
-        <div onClick={() => setDetalleActivo(null)} style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(10, 12, 17, 0.85)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, animation: 'fadeInModal 0.2s ease-out', padding: '20px' }}>
-          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: Array.isArray(detalleActivo.data) ? '600px' : '450px', background: 'var(--panel)', borderRadius: 16, padding: '30px', border: '1px solid var(--border-soft)', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', maxHeight: '90vh', overflowY: 'auto' }}>
-            
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 15, borderBottom: '1px solid var(--border-soft)' }}>
-              <h2 style={{ margin: 0, color: 'var(--gold-light)', fontSize: 18 }}>{detalleActivo.tipo}</h2>
-              <button onClick={() => setDetalleActivo(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-3)', fontSize: 24, cursor: 'pointer' }}>×</button>
-            </div>
-
-            <div style={{ color: 'var(--text-2)' }}>
-              
-              {/* VISTA 1: Lista filtrada (Array) */}
-              {Array.isArray(detalleActivo.data) && (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', minWidth: '400px', borderCollapse: 'collapse', fontSize: 13 }}>
+            {loading ? <LoadingSpinner /> : tanqueosConBusqueda.length === 0 ? <EmptyState message="Sin registros financieros en este período" /> : (
+              <>
+                <div className="table-responsive-container" style={{ width:'100%', overflowX:'auto', WebkitOverflowScrolling:'touch', paddingBottom:8 }}>
+                  <table style={{ width:'100%', borderCollapse:'collapse', minWidth:'700px' }}>
                     <thead>
-                      <tr style={{ textAlign: 'left', color: 'var(--text-3)', borderBottom: '1px solid var(--border-soft)' }}>
-                        <th style={{ padding: '10px' }}>Fecha</th>
-                        <th style={{ padding: '10px' }}>Unidad</th>
-                        <th style={{ padding: '10px', textAlign: 'right' }}>Inversión</th>
+                      <tr>
+                        {['Fecha','Unidad','Chofer Responsable','Inversión ($)','Acciones'].map(h => (
+                          <th key={h} style={{ padding:'10px 20px', textAlign:'left', fontSize:10, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.12em', color:'var(--text-3)', borderBottom:'1px solid var(--border-soft)', background:'var(--panel2)', whiteSpace:'nowrap' }}>{h}</th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {detalleActivo.data.length === 0 ? <tr><td colSpan="3" style={{padding:20, textAlign:'center'}}>No hay transacciones registradas</td></tr> : null}
-                      {detalleActivo.data.map((t, i) => (
-                        <tr key={i} style={{ borderBottom: '1px solid var(--border-soft)' }}>
-                          <td style={{ padding: '12px 10px', fontFamily: 'Space Mono', fontSize: 11 }}>{new Date(t.fecha).toLocaleDateString('es-EC')}</td>
-                          <td style={{ padding: '12px 10px' }}>
-                            <div style={{ color: '#fff', fontWeight: 600, fontFamily: 'Space Mono' }}>{t.vehiculo?.placa || t.vehiculo?.codigo}</div>
-                            <div style={{ fontSize: 10, color: 'var(--text-3)' }}>{t.chofer ? `${t.chofer.nombre}` : '—'}</div>
+                      {tanqueosPagina.map(t => (
+                        <tr key={t.id}
+                          onClick={() => setDetalleActivo({ tipo:'Factura Detallada', data:t })}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--panel2)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                          style={{ transition:'background 0.15s', cursor:'pointer' }}>
+                          <td style={{ padding:'13px 20px', fontSize:11, fontFamily:'Space Mono', color:'var(--text-3)', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>
+                            {new Date(t.fecha).toLocaleString('es-EC', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })}
                           </td>
-                          <td style={{ padding: '12px 10px', textAlign: 'right', color: 'var(--gold-light)', fontWeight: 700, fontFamily: 'Space Mono' }}>${(t.costo_total||0).toFixed(2)}</td>
+                          <td style={{ padding:'13px 20px', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>
+                            <div style={{ fontFamily:'Space Mono', fontSize:12, color:'var(--gold-light)', fontWeight:700 }}>
+                              {t.vehiculo?.placa || `V-${t.vehiculo_id}`}
+                            </div>
+                            {t.vehiculo?.marca && <div style={{ fontSize:10, color:'var(--text-3)' }}>{t.vehiculo.marca} {t.vehiculo.modelo}</div>}
+                          </td>
+                          <td style={{ padding:'13px 20px', fontSize:13, color:'var(--text-2)', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>
+                            {t.chofer ? `${t.chofer.nombre} ${t.chofer.apellido}` : '—'}
+                          </td>
+                          <td style={{ padding:'13px 20px', fontSize:14, fontWeight:700, fontFamily:'Space Mono', color:'var(--gold-light)', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>
+                            ${(t.costo_total || 0).toFixed(2)}
+                          </td>
+                          <td style={{ padding:'13px 20px', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>
+                            <div style={{ display:'flex', gap:8 }}>
+                              <button onClick={e => { e.stopPropagation(); cargarDatosEdicion(t) }}
+                                style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(77,156,240,0.1)', color:'var(--blue)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }}>✏️</button>
+                              <button onClick={e => { e.stopPropagation(); eliminarTanqueo(t.id) }}
+                                style={{ fontSize:11, padding:'4px 10px', borderRadius:6, background:'rgba(224,82,82,0.1)', color:'var(--red)', border:'none', cursor:'pointer', fontFamily:'DM Sans' }}>🗑️</button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              )}
+                <Paginacion />
+              </>
+            )}
+          </Panel>
+        </>
+      )}
 
-              {/* VISTA 2: Detalle de una sola factura (Objeto) */}
-              {!Array.isArray(detalleActivo.data) && (
+      {detalleActivo && (
+        <div onClick={() => setDetalleActivo(null)}
+          style={{ position:'fixed', top:0, left:0, width:'100vw', height:'100vh', background:'rgba(10,12,17,0.85)', backdropFilter:'blur(5px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:10000, animation:'fadeInModal 0.2s ease-out', padding:'20px' }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ width:'100%', maxWidth:Array.isArray(detalleActivo.data) ? '600px' : '450px', background:'var(--panel)', borderRadius:16, padding:'30px', border:'1px solid var(--border-soft)', boxShadow:'0 20px 50px rgba(0,0,0,0.5)', maxHeight:'90vh', overflowY:'auto' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20, paddingBottom:15, borderBottom:'1px solid var(--border-soft)' }}>
+              <h2 style={{ margin:0, color:'var(--gold-light)', fontSize:18 }}>{detalleActivo.tipo}</h2>
+              <button onClick={() => setDetalleActivo(null)} style={{ background:'transparent', border:'none', color:'var(--text-3)', fontSize:24, cursor:'pointer' }}>×</button>
+            </div>
+            <div style={{ color:'var(--text-2)' }}>
+              {Array.isArray(detalleActivo.data) ? (
+                <div style={{ overflowX:'auto' }}>
+                  <table style={{ width:'100%', minWidth:'400px', borderCollapse:'collapse', fontSize:13 }}>
+                    <thead>
+                      <tr style={{ textAlign:'left', color:'var(--text-3)', borderBottom:'1px solid var(--border-soft)' }}>
+                        <th style={{ padding:10 }}>Fecha</th>
+                        <th style={{ padding:10 }}>Unidad</th>
+                        <th style={{ padding:10, textAlign:'right' }}>Inversión</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detalleActivo.data.length === 0
+                        ? <tr><td colSpan="3" style={{ padding:20, textAlign:'center' }}>No hay transacciones registradas</td></tr>
+                        : detalleActivo.data.map((t, i) => (
+                          <tr key={i} style={{ borderBottom:'1px solid var(--border-soft)' }}>
+                            <td style={{ padding:'12px 10px', fontFamily:'Space Mono', fontSize:11 }}>{new Date(t.fecha).toLocaleDateString('es-EC')}</td>
+                            <td style={{ padding:'12px 10px' }}>
+                              <div style={{ color:'#fff', fontWeight:600, fontFamily:'Space Mono' }}>{t.vehiculo?.placa}</div>
+                              <div style={{ fontSize:10, color:'var(--text-3)' }}>{t.chofer ? `${t.chofer.nombre}` : '—'}</div>
+                            </td>
+                            <td style={{ padding:'12px 10px', textAlign:'right', color:'var(--gold-light)', fontWeight:700, fontFamily:'Space Mono' }}>${(t.costo_total||0).toFixed(2)}</td>
+                          </tr>
+                        ))
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
                 <div>
-                  <div style={{ textAlign: 'center', marginBottom: 25, paddingBottom: 20, borderBottom: '1px dashed var(--border-soft)' }}>
-                    <div style={{ fontSize: 12, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 1 }}>Costo Registrado</div>
-                    <div style={{ fontSize: 42, fontWeight: 800, color: 'var(--gold-light)', fontFamily: 'Space Mono', margin: '10px 0' }}>
+                  <div style={{ textAlign:'center', marginBottom:25, paddingBottom:20, borderBottom:'1px dashed var(--border-soft)' }}>
+                    <div style={{ fontSize:12, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:1 }}>Costo Registrado</div>
+                    <div style={{ fontSize:42, fontWeight:800, color:'var(--gold-light)', fontFamily:'Space Mono', margin:'10px 0' }}>
                       ${(detalleActivo.data.costo_total || 0).toFixed(2)}
                     </div>
-                    <div style={{ fontSize: 13, color: 'var(--text-2)' }}>Registrado el: {new Date(detalleActivo.data.fecha).toLocaleString('es-EC')}</div>
+                    <div style={{ fontSize:13, color:'var(--text-2)' }}>Registrado el: {new Date(detalleActivo.data.fecha).toLocaleString('es-EC')}</div>
                   </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13, color: 'var(--text-2)', padding: '15px', background: 'var(--panel2)', borderRadius: 8 }}>
-                    <div><strong style={{ color: '#fff' }}>Unidad:</strong> <span style={{ float: 'right', fontFamily: 'Space Mono', color: 'var(--gold-light)', fontWeight: 'bold' }}>{detalleActivo.data.vehiculo?.placa || detalleActivo.data.vehiculo?.codigo}</span></div>
-                    <div><strong style={{ color: '#fff' }}>Chofer:</strong> <span style={{ float: 'right' }}>{detalleActivo.data.chofer ? `${detalleActivo.data.chofer.nombre} ${detalleActivo.data.chofer.apellido}` : '—'}</span></div>
-                    <div style={{ marginTop: 5, paddingTop: 10, borderTop: '1px solid var(--border-soft)' }}>
-                      <strong style={{ color: '#fff', display: 'block', marginBottom: 5 }}>Observaciones:</strong> 
-                      <div style={{ background: 'rgba(0,0,0,0.2)', padding: 10, borderRadius: 6, fontStyle: 'italic' }}>
-                        {detalleActivo.data.observaciones || 'Sin detalles.'}
+                  <div style={{ display:'flex', flexDirection:'column', gap:12, fontSize:13, color:'var(--text-2)', padding:'15px', background:'var(--panel2)', borderRadius:8 }}>
+                    <div><strong style={{ color:'#fff' }}>Unidad:</strong><span style={{ float:'right', fontFamily:'Space Mono', color:'var(--gold-light)', fontWeight:'bold' }}>{detalleActivo.data.vehiculo?.placa}</span></div>
+                    <div><strong style={{ color:'#fff' }}>Chofer:</strong><span style={{ float:'right' }}>{detalleActivo.data.chofer ? `${detalleActivo.data.chofer.nombre} ${detalleActivo.data.chofer.apellido}` : '—'}</span></div>
+                    {detalleActivo.data.observaciones && (
+                      <div style={{ marginTop:5, paddingTop:10, borderTop:'1px solid var(--border-soft)' }}>
+                        <strong style={{ color:'#fff', display:'block', marginBottom:5 }}>Observaciones:</strong>
+                        <div style={{ background:'rgba(0,0,0,0.2)', padding:10, borderRadius:6, fontStyle:'italic' }}>
+                          {detalleActivo.data.observaciones}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               )}
-
             </div>
           </div>
         </div>
       )}
-      
+
       <style>{`
-        @keyframes fadeInModal { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        @keyframes fadeInModal { from { opacity:0; transform:scale(0.95); } to { opacity:1; transform:scale(1); } }
       `}</style>
     </div>
   )

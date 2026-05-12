@@ -65,7 +65,6 @@ class Vehiculo(Base):
     estado = Column(Enum(EstadoVehiculo), default=EstadoVehiculo.libre)
     kilometraje_actual = Column(Float, default=0)
     horas_operacion = Column(Float, default=0)
-    nivel_combustible = Column(Float, default=100)  # porcentaje
     activo = Column(Boolean, default=True)
     creado_en = Column(DateTime(timezone=True), server_default=func.now())
     actualizado_en = Column(DateTime(timezone=True), onupdate=func.now())

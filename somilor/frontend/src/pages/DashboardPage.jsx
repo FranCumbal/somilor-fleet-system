@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { dashboardAPI } from '../services/api'
+import { dashboardAPI, generacionAPI } from '../services/api'
 import { KpiCard, Panel, PanelHeader, PageHeader, StatusPill } from '../components/layout/UI'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 
@@ -29,13 +29,20 @@ const VehiculoStatus = ({ estado }) => {
 
 export default function DashboardPage() {
   const [kpis, setKpis] = useState(null)
+  const [genData, setGenData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState(null)
   const [detalleActivo, setDetalleActivo] = useState(null)
 
   useEffect(() => {
-    dashboardAPI.kpis()
-      .then(r => setKpis(r.data))
+    Promise.all([
+      dashboardAPI.kpis(),
+      generacionAPI.dashboard(),
+    ])
+      .then(([kpisRes, genRes]) => {
+        setKpis(kpisRes.data)
+        setGenData(genRes.data)
+      })
       .catch(err => console.error("Error cargando dashboard:", err))
       .finally(() => setLoading(false))
   }, [])
@@ -151,6 +158,57 @@ export default function DashboardPage() {
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(300px, 1fr))', gap:16 }}>
         
         {/* 4. DISPONIBILIDAD DE FLOTA */}
+      {genData && (
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:14 }}>
+          
+          <div onClick={() => setDetalleActivo({ tipo: 'Generación — semana', data: genData.consumo_semanal })}
+            style={{ background:'var(--panel)', border:'1px solid var(--border-soft)', borderRadius:12, padding:'18px 20px', position:'relative', overflow:'hidden', cursor:'pointer', transition:'transform 0.2s' }}
+            onMouseOver={e => e.currentTarget.style.transform='translateY(-3px)'}
+            onMouseOut={e => e.currentTarget.style.transform='translateY(0)'}>
+            <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background:'var(--gold)', opacity:0.7 }} />
+            <div style={{ fontSize:11, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:4 }}>⚡ Galones hoy</div>
+            <div style={{ fontSize:26, fontWeight:600, fontFamily:'Space Mono' }}>{genData.total_hoy.toFixed(2)}</div>
+            <div style={{ fontSize:11, color:'var(--text-3)', marginTop:4 }}>gal consumidos</div>
+          </div>
+
+          <div onClick={() => setDetalleActivo({ tipo: 'Generación — costo hoy', data: genData.consumo_semanal })}
+            style={{ background:'var(--panel)', border:'1px solid var(--border-soft)', borderRadius:12, padding:'18px 20px', position:'relative', overflow:'hidden', cursor:'pointer', transition:'transform 0.2s' }}
+            onMouseOver={e => e.currentTarget.style.transform='translateY(-3px)'}
+            onMouseOut={e => e.currentTarget.style.transform='translateY(0)'}>
+            <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background:'var(--green)', opacity:0.7 }} />
+            <div style={{ fontSize:11, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:4 }}>⚡ Costo hoy</div>
+            <div style={{ fontSize:26, fontWeight:600, fontFamily:'Space Mono' }}>${genData.costo_hoy?.toFixed(2) ?? '—'}</div>
+            <div style={{ fontSize:11, color:'var(--text-3)', marginTop:4 }}>diesel generación</div>
+          </div>
+
+          <div onClick={() => setDetalleActivo({ tipo: 'Generación — mes', data: genData.por_generador })}
+            style={{ background:'var(--panel)', border:'1px solid var(--border-soft)', borderRadius:12, padding:'18px 20px', position:'relative', overflow:'hidden', cursor:'pointer', transition:'transform 0.2s' }}
+            onMouseOver={e => e.currentTarget.style.transform='translateY(-3px)'}
+            onMouseOut={e => e.currentTarget.style.transform='translateY(0)'}>
+            <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background:'var(--blue)', opacity:0.7 }} />
+            <div style={{ fontSize:11, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:4 }}>⚡ Galones mes</div>
+            <div style={{ fontSize:26, fontWeight:600, fontFamily:'Space Mono' }}>{genData.total_mes.toFixed(2)}</div>
+            <div style={{ fontSize:11, color:'var(--text-3)', marginTop:4 }}>${genData.costo_mes?.toFixed(2) ?? '—'} este mes</div>
+          </div>
+
+          <div onClick={() => setDetalleActivo({ tipo: 'Generación — por generador', data: genData.por_generador })}
+            style={{ background:'var(--panel)', border:'1px solid var(--border-soft)', borderRadius:12, padding:'18px 20px', position:'relative', overflow:'hidden', cursor:'pointer', transition:'transform 0.2s' }}
+            onMouseOver={e => e.currentTarget.style.transform='translateY(-3px)'}
+            onMouseOut={e => e.currentTarget.style.transform='translateY(0)'}>
+            <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background:'var(--amber)', opacity:0.7 }} />
+            <div style={{ fontSize:11, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:4 }}>⚡ Mayor consumo mes</div>
+            {genData.por_generador?.length > 0 ? (() => {
+              const top = [...genData.por_generador].sort((a, b) => b.galones_mes - a.galones_mes)[0]
+              return (
+                <>
+                  <div style={{ fontSize:14, fontWeight:600, color:'var(--gold-light)', marginTop:4 }}>{top.nombre}</div>
+                  <div style={{ fontSize:11, color:'var(--text-3)', marginTop:2 }}>{top.galones_mes} gal — {top.ubicacion}</div>
+                </>
+              )
+            })() : <div style={{ fontSize:13, color:'var(--text-3)' }}>Sin datos</div>}
+          </div>
+        </div>
+      )}
         <Panel>
           <div onClick={() => setDetalleActivo({ tipo: 'Unidades: Estado General', data: flotaCompleta })} style={{ cursor: 'pointer' }}>
             <PanelHeader title="Disponibilidad de flota ➔" />
@@ -352,7 +410,65 @@ export default function DashboardPage() {
                   <div style={{ fontSize: 13, color: 'var(--text-3)', padding: '10px', background: 'rgba(200,168,75,0.05)', borderRadius: 8 }}><strong>Responsable:</strong> {detalleActivo.data.responsable}</div>
                 </div>
               )}
+              {/* Lógica: GENERACIÓN — semana */}
+              {detalleActivo.tipo === 'Generación — semana' && (
+                <div style={{ display:'grid', gap:10 }}>
+                  <p style={{ fontSize:13, marginBottom:10 }}>Consumo diario de diesel — últimos 7 días.</p>
+                  {detalleActivo.data.map((d, i) => (
+                    <div key={i} style={{ display:'flex', justifyContent:'space-between', background:'var(--panel2)', padding:'10px 15px', borderRadius:8 }}>
+                      <span style={{ color:'var(--text-2)' }}>Día: <strong style={{ color:'#fff' }}>{d.dia}</strong></span>
+                      <span style={{ fontFamily:'Space Mono', color:'var(--gold)' }}>{d.galones.toFixed(2)} gal</span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
+              {/* Lógica: GENERACIÓN — costo hoy */}
+              {detalleActivo.tipo === 'Generación — costo hoy' && (
+                <div style={{ display:'grid', gap:10 }}>
+                  <p style={{ fontSize:13, marginBottom:10 }}>Consumo diario — últimos 7 días.</p>
+                  {detalleActivo.data.map((d, i) => (
+                    <div key={i} style={{ display:'flex', justifyContent:'space-between', background:'var(--panel2)', padding:'10px 15px', borderRadius:8 }}>
+                      <span style={{ color:'var(--text-2)' }}><strong style={{ color:'#fff' }}>{d.dia}</strong></span>
+                      <div style={{ display:'flex', gap:16 }}>
+                        <span style={{ fontFamily:'Space Mono', color:'var(--gold)' }}>{d.galones.toFixed(2)} gal</span>
+                        <span style={{ fontFamily:'Space Mono', color:'var(--green)' }}>${d.costo?.toFixed(2) ?? '—'}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Lógica: GENERACIÓN — mes y por generador */}
+              {(detalleActivo.tipo === 'Generación — mes' || detalleActivo.tipo === 'Generación — por generador') && (
+                <div style={{ overflowX:'auto' }}>
+                  <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+                    <thead>
+                      <tr style={{ textAlign:'left', color:'var(--text-3)', borderBottom:'1px solid var(--border-soft)' }}>
+                        <th style={{ padding:10 }}>Generador</th>
+                        <th style={{ padding:10 }}>Ubicación</th>
+                        <th style={{ padding:10 }}>Galones mes</th>
+                        <th style={{ padding:10 }}>Costo mes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...detalleActivo.data]
+                        .sort((a, b) => b.galones_mes - a.galones_mes)
+                        .map((g, i) => (
+                          <tr key={i} style={{ borderBottom:'1px solid var(--border-soft)' }}>
+                            <td style={{ padding:'12px 10px', color:'var(--gold-light)', fontWeight:600 }}>{g.nombre}</td>
+                            <td style={{ padding:'12px 10px', color:'var(--text-3)', fontSize:12 }}>{g.ubicacion}</td>
+                            <td style={{ padding:'12px 10px', fontFamily:'Space Mono' }}>{g.galones_mes} gal</td>
+                            <td style={{ padding:'12px 10px', fontFamily:'Space Mono', color:'var(--green)' }}>
+                              {g.costo_mes !== null ? `$${g.costo_mes.toFixed(2)}` : '—'}
+                            </td>
+                          </tr>
+                        ))
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              )}
               {/* Lógica: Ficha Técnica de 1 solo Vehículo desde el Modal */}
               {!Array.isArray(detalleActivo.data) && detalleActivo.tipo.includes('Unidades') && (
                 <div>

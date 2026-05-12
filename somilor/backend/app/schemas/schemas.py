@@ -55,8 +55,6 @@ class VehiculoBase(BaseModel):
     tipo: TipoVehiculo
     kilometraje_actual: float = 0
     horas_operacion: float = 0
-    nivel_combustible: float = 100
-    nivel_combustible: float = 100
 
 class VehiculoCreate(VehiculoBase): pass
 
@@ -64,7 +62,6 @@ class VehiculoUpdate(BaseModel):
     estado: Optional[EstadoVehiculo] = None
     kilometraje_actual: Optional[float] = None
     horas_operacion: Optional[float] = None
-    nivel_combustible: Optional[float] = None
 
 class VehiculoOut(VehiculoBase):
     id: int
