@@ -7,15 +7,16 @@ import { ProfileDropdown } from './UI'
 import logo from '../../assets/SomilorLogo.png'
 
 const navItems = [
-  { to: '/dashboard',     icon: '▦',  label: 'Panel principal' },
-  { to: '/asignaciones',  icon: '🔑', label: 'Asignaciones' },
-  { to: '/vehiculos',     icon: '🚛', label: 'Flota' },
-  { to: '/choferes',      icon: '👷', label: 'Choferes' },
-  { to: '/combustible',   icon: '⛽', label: 'Combustible' },
-  { to: '/mantenimiento', icon: '🔧', label: 'Mantenimiento' },
-  { to: '/checklist',     icon: '✅', label: 'Checklist' },
-  { to: '/personal',      icon: '👥', label: 'Personal' },
-  { to: '/generacion',    icon: '⚡', label: 'Generación' },
+  { to: '/dashboard',     icon: '▦',  label: 'Panel principal', roles: ['admin', 'operador', 'transportista'] },
+  { to: '/asignaciones',  icon: '🔑', label: 'Asignaciones',    roles: ['admin', 'operador'] },
+  { to: '/vehiculos',     icon: '🚛', label: 'Flota',           roles: ['admin', 'operador'] },
+  { to: '/choferes',      icon: '👷', label: 'Choferes',        roles: ['admin', 'operador'] },
+  { to: '/combustible',   icon: '⛽', label: 'Combustible',     roles: ['admin', 'operador'] },
+  { to: '/mantenimiento', icon: '🔧', label: 'Mantenimiento',   roles: ['admin', 'operador', 'transportista'] },
+  { to: '/kilometraje',   icon: '🛣️', label: 'Kilometraje',     roles: ['admin', 'transportista'] }, // <-- NUEVA LÍNEA
+  { to: '/checklist',     icon: '✅', label: 'Checklist',       roles: ['admin', 'operador'] },
+  { to: '/personal',      icon: '👥', label: 'Personal',        roles: ['admin', 'operador'] },
+  { to: '/generacion',    icon: '⚡', label: 'Generación',      roles: ['admin', 'operador'] },
 ]
 
 // Iconos SVG limpios para la interfaz
@@ -81,7 +82,6 @@ export default function Layout() {
             <span className="status-text">SISTEMA ACTIVO</span>
           </div>
           
-          {/* AQUÍ ESTÁ LA MAGIA: Reemplazamos tu div user-avatar por el ProfileDropdown */}
           <ProfileDropdown 
             userInitials={user?.nombre?.charAt(0).toUpperCase() || 'U'} 
             userName={user?.nombre || 'Administrador'} 
@@ -98,8 +98,11 @@ export default function Layout() {
         <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'mobile-open' : ''}`}>
           <div className="nav-header">Navegación</div>
           
+          {/* 2. AQUÍ ESTÁ EL MENÚ FILTRADO CORRECTAMENTE DENTRO DEL ASIDE */}
           <div className="nav-menu">
-            {navItems.map(({ to, icon, label }) => (
+            {navItems
+              .filter(item => item.roles.includes(user?.rol))
+              .map(({ to, icon, label }) => (
               <NavLink key={to} to={to} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                 <span className="nav-icon">{icon}</span>
                 <span className="nav-label">{label}</span>

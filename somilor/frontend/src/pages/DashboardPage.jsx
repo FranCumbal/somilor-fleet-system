@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { dashboardAPI, generacionAPI } from '../services/api'
 import { KpiCard, Panel, PanelHeader, PageHeader, StatusPill } from '../components/layout/UI'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { useAuth } from '../hooks/useAuth'
 
 const choferesList = [
   { nombre: 'Carlos Ruiz', unidad: 'GSD-9876', licencia: 'Tipo E', turno: 'Diurno' },
@@ -33,7 +34,9 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState(null)
   const [detalleActivo, setDetalleActivo] = useState(null)
-
+  const { user } = useAuth()
+  const isTransportista = user?.rol === 'transportista'
+  
   useEffect(() => {
     Promise.all([
       dashboardAPI.kpis(),
@@ -92,46 +95,53 @@ export default function DashboardPage() {
 
       {/* 1. KPIs BÁSICOS */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:14 }}>
-        <div onClick={() => setDetalleActivo({ tipo: 'Unidades Operativas', data: flotaCompleta.filter(f => f.estado.toLowerCase().includes('operativ')) })} style={{cursor:'pointer', transition:'transform 0.2s'}} onMouseOver={e => e.currentTarget.style.transform='translateY(-3px)'} onMouseOut={e => e.currentTarget.style.transform='translateY(0)'}>
-          <KpiCard label="Vehículos operativos" value={loading ? '...' : k.vehiculos_operativos ?? 0} delta="Datos en tiempo real" deltaType="up" accent="var(--green)" />
-        </div>
         <div onClick={() => setDetalleActivo({ tipo: 'Unidades en Taller', data: flotaCompleta.filter(f => f.estado.toLowerCase().includes('taller')) })} style={{cursor:'pointer', transition:'transform 0.2s'}} onMouseOver={e => e.currentTarget.style.transform='translateY(-3px)'} onMouseOut={e => e.currentTarget.style.transform='translateY(0)'}>
           <KpiCard label="En taller" value={loading ? '...' : k.vehiculos_taller ?? 0} delta="Atención requerida" deltaType="down" accent="var(--red)" />
         </div>
-        <div onClick={() => setDetalleActivo({ tipo: 'Inversión en Combustible', data: fuelData })} style={{cursor:'pointer', transition:'transform 0.2s'}} onMouseOver={e => e.currentTarget.style.transform='translateY(-3px)'} onMouseOut={e => e.currentTarget.style.transform='translateY(0)'}>
-          <KpiCard label="Gasto en combustible hoy" value={loading ? '...' : `$${k.combustible_hoy_costo ?? '0.00'}`} delta="Corte de hoy" deltaType="warn" accent="var(--gold)" />
-        </div>
-        <div onClick={() => setDetalleActivo({ tipo: 'Nómina de Choferes', data: choferesList })} style={{cursor:'pointer', transition:'transform 0.2s'}} onMouseOver={e => e.currentTarget.style.transform='translateY(-3px)'} onMouseOut={e => e.currentTarget.style.transform='translateY(0)'}>
-          <KpiCard label="Choferes activos" value={loading ? '...' : k.choferes_activos ?? 0} delta="Plantilla actual" deltaType="up" accent="var(--blue)" />
-        </div>
+        
+        {!isTransportista && (
+          <>
+            <div onClick={() => setDetalleActivo({ tipo: 'Unidades Operativas', data: flotaCompleta.filter(f => f.estado.toLowerCase().includes('operativ')) })} style={{cursor:'pointer', transition:'transform 0.2s'}} onMouseOver={e => e.currentTarget.style.transform='translateY(-3px)'} onMouseOut={e => e.currentTarget.style.transform='translateY(0)'}>
+              <KpiCard label="Vehículos operativos" value={loading ? '...' : k.vehiculos_operativos ?? 0} delta="Datos en tiempo real" deltaType="up" accent="var(--green)" />
+            </div>
+            <div onClick={() => setDetalleActivo({ tipo: 'Inversión en Combustible', data: fuelData })} style={{cursor:'pointer', transition:'transform 0.2s'}} onMouseOver={e => e.currentTarget.style.transform='translateY(-3px)'} onMouseOut={e => e.currentTarget.style.transform='translateY(0)'}>
+              <KpiCard label="Gasto en combustible hoy" value={loading ? '...' : `$${k.combustible_hoy_costo ?? '0.00'}`} delta="Corte de hoy" deltaType="warn" accent="var(--gold)" />
+            </div>
+            <div onClick={() => setDetalleActivo({ tipo: 'Nómina de Choferes', data: choferesList })} style={{cursor:'pointer', transition:'transform 0.2s'}} onMouseOver={e => e.currentTarget.style.transform='translateY(-3px)'} onMouseOut={e => e.currentTarget.style.transform='translateY(0)'}>
+              <KpiCard label="Choferes activos" value={loading ? '...' : k.choferes_activos ?? 0} delta="Plantilla actual" deltaType="up" accent="var(--blue)" />
+            </div>
+          </>
+        )}
       </div>
 
       <div style={{ display:'grid', gridTemplateColumns:'1fr 320px', gap:16 }}>
         
         {/* 2. GRÁFICO DE COMBUSTIBLE */}
-        <Panel style={{ maxWidth: '100%', overflow: 'hidden', height: '100%' }}>
-          <div onClick={() => setDetalleActivo({ tipo: 'Inversión en Combustible', data: fuelData })} style={{ cursor: 'pointer' }} title="Ver registro semanal completo">
-            <PanelHeader title="Inversión en Combustible — semana (USD) ➔" />
-          </div>
-          <div style={{ padding:'20px 20px 10px' }}>
-            {loading ? (
-              <div style={{ display: 'flex', height: 200, alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Cargando gráfica...</div>
-            ) : (
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={fuelData} margin={{ top:10, right:10, left:-20, bottom:0 }} onClick={handleChartClick}>
-                  <XAxis dataKey="dia" tick={{ fill:'var(--text-3)', fontSize:11 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill:'var(--text-3)', fontSize:11 }} axisLine={false} tickLine={false} tickFormatter={(val) => `$${val}`} />
-                  <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{ background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, fontSize:12 }} />
-                  <Bar dataKey="costo" radius={[4,4,0,0]} cursor="pointer">
-                    {fuelData.map((entry, i) => (
-                      <Cell key={i} fill={entry.dia === 'Hoy' ? 'var(--gold)' : 'rgba(200,168,75,0.35)'} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </Panel>
+        {!isTransportista && (
+          <Panel style={{ maxWidth: '100%', overflow: 'hidden', height: '100%' }}>
+            <div onClick={() => setDetalleActivo({ tipo: 'Inversión en Combustible', data: fuelData })} style={{ cursor: 'pointer' }} title="Ver registro semanal completo">
+              <PanelHeader title="Inversión en Combustible — semana (USD) ➔" />
+            </div>
+            <div style={{ padding:'20px 20px 10px' }}>
+              {loading ? (
+                <div style={{ display: 'flex', height: 200, alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Cargando gráfica...</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={fuelData} margin={{ top:10, right:10, left:-20, bottom:0 }} onClick={handleChartClick}>
+                    <XAxis dataKey="dia" tick={{ fill:'var(--text-3)', fontSize:11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill:'var(--text-3)', fontSize:11 }} axisLine={false} tickLine={false} tickFormatter={(val) => `$${val}`} />
+                    <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{ background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, fontSize:12 }} />
+                    <Bar dataKey="costo" radius={[4,4,0,0]} cursor="pointer">
+                      {fuelData.map((entry, i) => (
+                        <Cell key={i} fill={entry.dia === 'Hoy' ? 'var(--gold)' : 'rgba(200,168,75,0.35)'} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </Panel>
+        )}
 
         {/* 3. ALERTAS ACTIVAS */}
         <Panel>
@@ -157,8 +167,8 @@ export default function DashboardPage() {
 
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(300px, 1fr))', gap:16 }}>
         
-        {/* 4. DISPONIBILIDAD DE FLOTA */}
-      {genData && (
+        {/* 4. DISPONIBILIDAD DE FLOTA Y GENERACIÓN */}
+      {!isTransportista && genData && (
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:14 }}>
           
           <div onClick={() => setDetalleActivo({ tipo: 'Generación — semana', data: genData.consumo_semanal })}
@@ -209,6 +219,8 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {!isTransportista && (
         <Panel>
           <div onClick={() => setDetalleActivo({ tipo: 'Unidades: Estado General', data: flotaCompleta })} style={{ cursor: 'pointer' }}>
             <PanelHeader title="Disponibilidad de flota ➔" />
@@ -231,6 +243,7 @@ export default function DashboardPage() {
             ))}
           </div>
         </Panel>
+      )}
 
         {/* 5. MANTENIMIENTOS */}
         <Panel style={{ maxWidth: '100%', overflow: 'hidden' }}>

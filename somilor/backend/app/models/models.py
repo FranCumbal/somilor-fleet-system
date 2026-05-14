@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Date, Text, ForeignKey, Enum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
@@ -64,7 +64,6 @@ class Vehiculo(Base):
     tipo = Column(Enum(TipoVehiculo), nullable=False)
     estado = Column(Enum(EstadoVehiculo), default=EstadoVehiculo.libre)
     kilometraje_actual = Column(Float, default=0)
-    horas_operacion = Column(Float, default=0)
     activo = Column(Boolean, default=True)
     creado_en = Column(DateTime(timezone=True), server_default=func.now())
     actualizado_en = Column(DateTime(timezone=True), onupdate=func.now())
@@ -209,3 +208,14 @@ class ConsumoGenerador(Base):
 
     generador = relationship("Generador", back_populates="consumos")
     personal  = relationship("Personal", back_populates="consumos")
+
+class HistorialKilometraje(Base):
+    __tablename__ = "historial_kilometraje"
+    id = Column(Integer, primary_key=True, index=True)
+    vehiculo_id = Column(Integer, ForeignKey("vehiculos.id"), nullable=False)
+    fecha = Column(Date, nullable=False)
+    kilometraje = Column(Float, nullable=False)
+    observaciones = Column(Text)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now())
+
+    vehiculo = relationship("Vehiculo")

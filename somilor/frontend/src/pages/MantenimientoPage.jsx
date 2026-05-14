@@ -270,7 +270,7 @@ export default function MantenimientoPage() {
                       </select>
                     </div>
                     <div>
-                      <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Kilometraje / Horas</label>
+                      <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Kilometraje</label>
                       <input type="number" min="0" step="any" placeholder="Ej: 85000" value={f.km_programado}
                         onChange={e => updateField(f.idRef, 'km_programado', e.target.value)} onKeyDown={preventInvalidChars}
                         style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none' }} />

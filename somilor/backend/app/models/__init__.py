@@ -5,4 +5,5 @@ from app.models.models import (
     TipoMantenimiento, EstadoMantenimiento,
     CatalogoMantenimiento,
     Personal, Generador, PrecioDiesel, ConsumoGenerador,
+    HistorialKilometraje
 )

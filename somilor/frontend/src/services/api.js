@@ -43,6 +43,13 @@ export const vehiculosAPI = {
   delete: (id) => api.delete(`/vehiculos/${id}`),
 }
 
+export const kilometrajeAPI = {
+  list: (params) => api.get('/kilometraje/', { params }),
+  create: (data) => api.post('/kilometraje/', data),
+  update: (id, data) => api.patch(`/kilometraje/${id}`, data), 
+  delete: (id) => api.delete(`/kilometraje/${id}`),           
+}
+
 export const choferesAPI = {
   list: () => api.get('/choferes'),
   get: (id) => api.get(`/choferes/${id}`),

@@ -75,7 +75,7 @@ def obtener_kpis(db: Session = Depends(get_db)):
     
     mantenimientos_data = []
     for m, v in mants_db:
-        km_visual = f"{v.kilometraje_actual} km" if v.kilometraje_actual > 0 else f"{v.horas_operacion} h"
+        km_visual = f"{v.kilometraje_actual} km"
         mantenimientos_data.append({
             "placa": v.placa or v.codigo,
             "vehiculo": f"{v.marca} {v.modelo or ''}".strip(),

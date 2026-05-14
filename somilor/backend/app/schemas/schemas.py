@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, date
 from app.models import EstadoVehiculo, TipoVehiculo, TipoMantenimiento, EstadoMantenimiento
 
 
@@ -54,14 +54,12 @@ class VehiculoBase(BaseModel):
     color: Optional[str] = None
     tipo: TipoVehiculo
     kilometraje_actual: float = 0
-    horas_operacion: float = 0
 
 class VehiculoCreate(VehiculoBase): pass
 
 class VehiculoUpdate(BaseModel):
     estado: Optional[EstadoVehiculo] = None
     kilometraje_actual: Optional[float] = None
-    horas_operacion: Optional[float] = None
 
 class VehiculoOut(VehiculoBase):
     id: int
@@ -265,4 +263,21 @@ class ConsumoGeneradorOut(ConsumoGeneradorCreate):
     generador:       GeneradorOut
     personal:        Optional[PersonalOut] = None
     costo_calculado: Optional[float]       = None
+    class Config: from_attributes = True
+
+# ── KILOMETRAJE ─────────────────────────────────────
+class KilometrajeCreate(BaseModel):
+    vehiculo_id: int
+    kilometraje: float
+    observaciones: Optional[str] = None
+
+class KilometrajeUpdate(BaseModel):
+    kilometraje: Optional[float] = None
+    observaciones: Optional[str] = None
+
+class KilometrajeOut(KilometrajeCreate):
+    id: int
+    fecha: date
+    creado_en: datetime
+    vehiculo: VehiculoOut
     class Config: from_attributes = True

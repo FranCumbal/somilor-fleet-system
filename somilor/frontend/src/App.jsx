@@ -11,15 +11,24 @@ import ChecklistPage from './pages/ChecklistPage'
 import AsignacionesPage from './pages/AsignacionesPage' 
 import PersonalPage    from './pages/PersonalPage'
 import GeneracionPage  from './pages/GeneracionPage'
+import KilometrajePage from './pages/KilometrajePage'
 
-function PrivateRoute({ children }) {
+function PrivateRoute({ children, allowedRoles }) {
   const { user, loading } = useAuth()
+  
   if (loading) return (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', color:'#C8A84B', fontFamily:'Space Mono' }}>
       Cargando SOMILOR...
     </div>
   )
-  return user ? children : <Navigate to="/login" replace />
+  
+  if (!user) return <Navigate to="/login" replace />
+
+  if (allowedRoles && !allowedRoles.includes(user.rol)) {
+    return <Navigate to="/dashboard" replace />
+  }
+
+  return children
 }
 
 function AppRoutes() {
@@ -28,15 +37,18 @@ function AppRoutes() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route path="dashboard"      element={<DashboardPage />} />
-        <Route path="asignaciones"   element={<AsignacionesPage />} />
-        <Route path="vehiculos"      element={<VehiculosPage />} />
-        <Route path="choferes"       element={<ChoferesPage />} />
-        <Route path="combustible"    element={<CombustiblePage />} />
-        <Route path="mantenimiento"  element={<MantenimientoPage />} />
-        <Route path="checklist"      element={<ChecklistPage />} />
-        <Route path="personal"       element={<PersonalPage />} />
-        <Route path="generacion"     element={<GeneracionPage />} />
+        
+        <Route path="dashboard" element={<DashboardPage />} />
+        
+        <Route path="asignaciones" element={<PrivateRoute allowedRoles={['admin', 'operador']}><AsignacionesPage /></PrivateRoute>} />
+        <Route path="vehiculos" element={<PrivateRoute allowedRoles={['admin', 'operador']}><VehiculosPage /></PrivateRoute>} />
+        <Route path="choferes" element={<PrivateRoute allowedRoles={['admin', 'operador']}><ChoferesPage /></PrivateRoute>} />
+        <Route path="combustible" element={<PrivateRoute allowedRoles={['admin', 'operador']}><CombustiblePage /></PrivateRoute>} />
+        <Route path="checklist" element={<PrivateRoute allowedRoles={['admin', 'operador']}><ChecklistPage /></PrivateRoute>} />
+        <Route path="personal" element={<PrivateRoute allowedRoles={['admin', 'operador']}><PersonalPage /></PrivateRoute>} />
+        <Route path="generacion" element={<PrivateRoute allowedRoles={['admin', 'operador']}><GeneracionPage /></PrivateRoute>} />
+        <Route path="mantenimiento" element={<PrivateRoute allowedRoles={['admin', 'operador', 'transportista']}><MantenimientoPage /></PrivateRoute>} />
+        <Route path="kilometraje" element={<PrivateRoute allowedRoles={['admin', 'transportista']}><KilometrajePage /></PrivateRoute>} />
       </Route>
     </Routes>
   )
