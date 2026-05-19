@@ -112,7 +112,6 @@ export default function LoginPage() {
         </form>
 
         <div style={{ marginTop:24, padding:'14px', background:'var(--panel2)', borderRadius:8, fontSize:12, color:'var(--text-3)', fontFamily:'Space Mono', textAlign: 'center' }}>
-          Demo: admin@somilor.com / admin123
         </div>
       </div>
     </div>
