@@ -3,7 +3,8 @@ import { choferesAPI } from '../services/api'
 import { Panel, PanelHeader, PageHeader, Btn, LoadingSpinner, EmptyState } from '../components/layout/UI'
 
 const idUnico = () => Math.random().toString(36).substr(2, 9)
-const estadoInicial = { nombre:'', apellido:'', cedula:'', licencia:'', categoria_licencia:'', telefono:'' }
+// Estado inicial corregido: usa codigo_trabajador y tiene fecha_expiracion_licencia
+const estadoInicial = { nombre:'', apellido:'', cedula:'', codigo_trabajador:'', categoria_licencia:'', telefono:'', fecha_expiracion_licencia:'' }
 const CATEGORIAS_LICENCIA = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'Otra']
 
 export default function ChoferesPage() {
@@ -42,7 +43,7 @@ export default function ChoferesPage() {
   const handleSubmit = async (e) => {
     e.preventDefault(); setSaving(true); setError('')
     for (const f of formularios) {
-      if (f.licencia && f.licencia.length !== 4) {
+      if (f.codigo_trabajador && f.codigo_trabajador.length !== 4) {
         setError(`El Código de Trabajo de ${f.nombre} debe tener exactamente 4 dígitos.`)
         setSaving(false); return
       }
@@ -55,11 +56,14 @@ export default function ChoferesPage() {
       if (editandoId) {
         const payload = { ...formularios[0] }
         delete payload.idRef
+        // Si la fecha viene vacía la mandamos como null para no romper BD
+        if(!payload.fecha_expiracion_licencia) payload.fecha_expiracion_licencia = null
         await choferesAPI.update(editandoId, payload)
       } else {
         const promesas = formularios.map(f => {
           const payload = { ...f }
           delete payload.idRef
+          if(!payload.fecha_expiracion_licencia) payload.fecha_expiracion_licencia = null
           return choferesAPI.create(payload)
         })
         await Promise.all(promesas)
@@ -73,13 +77,14 @@ export default function ChoferesPage() {
   const cargarDatosEdicion = (c) => {
     setEditandoId(c.id)
     setFormularios([{
-      idRef:              idUnico(),
-      nombre:             c.nombre             || '',
-      apellido:           c.apellido            || '',
-      cedula:             c.cedula              || '',
-      licencia:           c.licencia            || '',
-      categoria_licencia: c.categoria_licencia  || '',
-      telefono:           c.telefono            || ''
+      idRef:                     idUnico(),
+      nombre:                    c.nombre              || '',
+      apellido:                  c.apellido            || '',
+      cedula:                    c.cedula              || '',
+      codigo_trabajador:         c.codigo_trabajador   || '',
+      categoria_licencia:        c.categoria_licencia  || '',
+      telefono:                  c.telefono            || '',
+      fecha_expiracion_licencia: c.fecha_expiracion_licencia || '' 
     }])
     setShowForm(true)
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -97,6 +102,20 @@ export default function ChoferesPage() {
     }
   }
 
+  // FUNCIÓN PARA MANEJAR LA SUBIDA DE FOTOS Y LICENCIAS
+  const handleUploadDocumento = async (e, tipo, id) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const res = await choferesAPI.uploadDocumento(id, tipo, file);
+      // Actualiza la vista del modal al instante con el nuevo dato
+      setDetalleActivo({ ...detalleActivo, data: res.data });
+      cargar(); // Recarga la lista general silenciosamente
+    } catch (error) {
+      alert("Error subiendo el archivo. Asegúrate de tener conexión.");
+    }
+  };
+
   const iniciales = (c) => `${c.nombre[0]}${c.apellido[0]}`
 
   const choferesFiltrados = choferes.filter(c => {
@@ -106,7 +125,7 @@ export default function ChoferesPage() {
       (c.nombre             || '').toLowerCase().includes(q) ||
       (c.apellido           || '').toLowerCase().includes(q) ||
       (c.cedula             || '').toLowerCase().includes(q) ||
-      (c.licencia           || '').toLowerCase().includes(q) ||
+      (c.codigo_trabajador  || '').toLowerCase().includes(q) ||
       (c.categoria_licencia || '').toLowerCase().includes(q) ||
       (c.telefono           || '').toLowerCase().includes(q)
     )
@@ -183,12 +202,13 @@ export default function ChoferesPage() {
               </PanelHeader>
               <div style={{ padding:20, display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:16 }}>
                 {[
-                  { key:'nombre',   label:'Nombres *',                    ph:'Ej: Carlos Andrés' },
-                  { key:'apellido', label:'Apellidos *',                   ph:'Ej: Mendoza' },
-                  { key:'cedula',   label:'Número de Cédula *',            ph:'Ej: 0912345678', isNumeric:true, maxLen:10 },
-                  { key:'licencia', label:'Cód. de Trabajo * (4 dígitos)', ph:'Ej: 1234',       isNumeric:true, maxLen:4 },
-                  { key:'categoria_licencia', label:'Categoría de Licencia', type:'select', options:CATEGORIAS_LICENCIA },
-                  { key:'telefono', label:'Teléfono de Contacto',          ph:'Ej: 0991234567', isNumeric:true, maxLen:10 },
+                  { key:'nombre',             label:'Nombres *',                    ph:'Ej: Carlos Andrés' },
+                  { key:'apellido',           label:'Apellidos *',                  ph:'Ej: Mendoza' },
+                  { key:'cedula',             label:'Número de Cédula *',           ph:'Ej: 0912345678', isNumeric:true, maxLen:10 },
+                  { key:'codigo_trabajador',  label:'Cód. de Trabajo * (4 dígitos)',ph:'Ej: 1234',       isNumeric:true, maxLen:4 },
+                  { key:'categoria_licencia', label:'Categoría de Licencia',        type:'select',       options:CATEGORIAS_LICENCIA },
+                  { key:'telefono',           label:'Teléfono de Contacto',         ph:'Ej: 0991234567', isNumeric:true, maxLen:10 },
+                  { key:'fecha_expiracion_licencia', label:'Vencimiento de Licencia', type:'date' },
                 ].map(campo => (
                   <div key={campo.key}>
                     <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>{campo.label}</label>
@@ -199,6 +219,12 @@ export default function ChoferesPage() {
                         <option value="">Seleccione...</option>
                         {campo.options.map(opt => <option key={opt} value={opt}>Tipo {opt}</option>)}
                       </select>
+                    ) : campo.type === 'date' ? (
+                      <input type="date" value={f[campo.key] || ''}
+                        onChange={e => updateField(f.idRef, campo.key, e.target.value)}
+                        required={campo.label.includes('*')}
+                        style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none', fontFamily:'DM Sans' }}
+                      />
                     ) : (
                       <input type="text" placeholder={campo.ph} value={f[campo.key]}
                         onChange={e => {
@@ -274,9 +300,14 @@ export default function ChoferesPage() {
                     onMouseOver={e => { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.background='var(--panel2)' }}
                     onMouseOut={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.background='var(--panel)' }}>
                     <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:16 }}>
-                      <div style={{ width:44, height:44, borderRadius:'50%', background:'rgba(200,168,75,0.15)', border:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Space Mono', fontSize:14, fontWeight:700, color:'var(--gold-light)', flexShrink:0 }}>
-                        {iniciales(c)}
-                      </div>
+                      {/* VISUALIZACIÓN DE FOTO EN TARJETAS PRINCIPALES */}
+                      {c.foto_url ? (
+                        <img src={`http://${window.location.hostname}:8000${c.foto_url}`} alt="Foto" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: '50%', border: '1px solid var(--border)' }} />
+                      ) : (
+                        <div style={{ width:44, height:44, borderRadius:'50%', background:'rgba(200,168,75,0.15)', border:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Space Mono', fontSize:14, fontWeight:700, color:'var(--gold-light)', flexShrink:0 }}>
+                          {iniciales(c)}
+                        </div>
+                      )}
                       <div>
                         <div style={{ fontWeight:600, fontSize:14 }}>{c.nombre} {c.apellido}</div>
                         <div style={{ fontSize:11, color:'var(--text-3)', fontFamily:'Space Mono' }}>CI: {c.cedula}</div>
@@ -284,7 +315,7 @@ export default function ChoferesPage() {
                     </div>
                     <div style={{ borderTop:'1px solid var(--border-soft)', paddingTop:12, display:'flex', flexDirection:'column', gap:6 }}>
                       {[
-                        { label:'Código de Trabajo', val:c.licencia || '—' },
+                        { label:'Código de Trabajo', val:c.codigo_trabajador || '—' },
                         { label:'Categoría',         val:c.categoria_licencia ? `Tipo ${c.categoria_licencia}` : '—' },
                         { label:'Teléfono',          val:c.telefono || '—' },
                       ].map(row => (
@@ -355,15 +386,27 @@ export default function ChoferesPage() {
                 </div>
               ) : (
                 <div>
+                  {/* MODAL DE FICHA INDIVIDUAL CON UPLOAD */}
                   <div style={{ display:'flex', alignItems:'center', gap:15, marginBottom:25 }}>
-                    <div style={{ width:60, height:60, borderRadius:'50%', background:'var(--panel2)', border:'2px solid var(--gold)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, fontWeight:700, color:'var(--gold-light)', flexShrink:0 }}>
-                      {iniciales(detalleActivo.data)}
+                    <div style={{ position: 'relative' }}>
+                      {detalleActivo.data.foto_url ? (
+                        <img src={`http://${window.location.hostname}:8000${detalleActivo.data.foto_url}`} alt="Foto" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: '50%', border: '2px solid var(--gold)' }} />
+                      ) : (
+                        <div style={{ width:60, height:60, borderRadius:'50%', background:'var(--panel2)', border:'2px solid var(--gold)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, fontWeight:700, color:'var(--gold-light)', flexShrink:0 }}>
+                          {iniciales(detalleActivo.data)}
+                        </div>
+                      )}
+                      <label style={{ position: 'absolute', bottom: -5, right: -5, background: 'var(--panel3)', cursor: 'pointer', padding: '4px', borderRadius: '50%', border: '1px solid var(--border)', fontSize: 12 }} title="Cambiar foto">
+                        📷
+                        <input type="file" style={{ display: 'none' }} accept="image/*" onChange={(e) => handleUploadDocumento(e, 'foto', detalleActivo.data.id)} />
+                      </label>
                     </div>
                     <div>
                       <div style={{ fontSize:22, fontWeight:'bold', color:'#fff' }}>{detalleActivo.data.nombre} {detalleActivo.data.apellido}</div>
                       <div style={{ fontSize:13, color:'var(--text-3)', marginTop:4 }}>ID: {detalleActivo.data.id} · Ingreso: {new Date(detalleActivo.data.creado_en).toLocaleDateString('es-EC')}</div>
                     </div>
                   </div>
+                  
                   <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:15, marginBottom:20 }}>
                     <div style={{ background:'var(--panel2)', padding:'15px', borderRadius:8, border:'1px solid var(--border-soft)' }}>
                       <div style={{ fontSize:11, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:'0.5px' }}>Documento de Identidad</div>
@@ -373,13 +416,39 @@ export default function ChoferesPage() {
                       <div style={{ fontSize:11, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:'0.5px' }}>Licencia de Conducir</div>
                       <div style={{ fontSize:16, fontWeight:600, color:'#fff', marginTop:5, fontFamily:'Space Mono' }}>{detalleActivo.data.categoria_licencia ? `Tipo ${detalleActivo.data.categoria_licencia}` : '—'}</div>
                     </div>
+                    <div style={{ background:'var(--panel2)', padding:'15px', borderRadius:8, border:'1px solid var(--border-soft)' }}>
+                      <div style={{ fontSize:11, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:'0.5px' }}>Vencimiento Licencia</div>
+                      <div style={{ fontSize:14, fontWeight:600, color:'#fff', marginTop:5, fontFamily:'Space Mono' }}>
+                        {detalleActivo.data.fecha_expiracion_licencia ? new Date(detalleActivo.data.fecha_expiracion_licencia).toLocaleDateString('es-EC') : 'No registrado'}
+                      </div>
+                    </div>
                   </div>
+
                   <div style={{ display:'flex', flexDirection:'column', gap:10, fontSize:13, color:'var(--text-2)', padding:'15px', background:'var(--panel2)', borderRadius:8 }}>
-                    <div><strong style={{ color:'#fff' }}>Código de Trabajo:</strong><span style={{ fontFamily:'Space Mono', float:'right', color:'var(--gold-light)' }}>{detalleActivo.data.licencia || 'No registrado'}</span></div>
+                    <div><strong style={{ color:'#fff' }}>Código de Trabajo:</strong><span style={{ fontFamily:'Space Mono', float:'right', color:'var(--gold-light)' }}>{detalleActivo.data.codigo_trabajador || 'No registrado'}</span></div>
                     <div><strong style={{ color:'#fff' }}>Teléfono Móvil:</strong><span style={{ fontFamily:'Space Mono', float:'right' }}>{detalleActivo.data.telefono || 'No registrado'}</span></div>
                     <div style={{ marginTop:10, paddingTop:10, borderTop:'1px solid var(--border-soft)' }}>
                       <strong style={{ color:'#fff' }}>Estado del Personal:</strong>
                       <span style={{ float:'right', color:'var(--green)', fontWeight:600 }}>ACTIVO Y AUTORIZADO</span>
+                    </div>
+
+                    {/* ZONA PARA SUBIR ARCHIVO PDF / IMAGEN DE LICENCIA */}
+                    <div style={{ marginTop:10, paddingTop:10, borderTop:'1px solid var(--border-soft)' }}>
+                      <strong style={{ color:'#fff', display: 'block', marginBottom: 10 }}>Documento de Licencia:</strong>
+                      {detalleActivo.data.licencia_url ? (
+                          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                              <a href={`http://${window.location.hostname}:8000${detalleActivo.data.licencia_url}`} target="_blank" rel="noreferrer" style={{ color: 'var(--gold-light)', fontSize: 13, textDecoration: 'none', background: 'rgba(200,168,75,0.1)', padding: '6px 12px', borderRadius: 6, fontWeight: 600 }}>📄 Ver Documento</a>
+                              <label style={{ cursor: 'pointer', fontSize: 12, color: 'var(--text-3)' }}>
+                                  (Reemplazar)
+                                  <input type="file" style={{ display: 'none' }} accept=".pdf,image/*" onChange={(e) => handleUploadDocumento(e, 'licencia', detalleActivo.data.id)} />
+                              </label>
+                          </div>
+                      ) : (
+                          <label style={{ display: 'inline-block', background: 'var(--panel3)', padding: '6px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer', border: '1px solid var(--border-soft)', color: 'var(--text-2)' }}>
+                              + Subir PDF o Imagen
+                              <input type="file" style={{ display: 'none' }} accept=".pdf,image/*" onChange={(e) => handleUploadDocumento(e, 'licencia', detalleActivo.data.id)} />
+                          </label>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -36,26 +36,41 @@ export const authAPI = {
 }
 
 export const vehiculosAPI = {
-  list: (params) => api.get('/vehiculos', { params }),
+  list: (params) => api.get('/vehiculos/', { params }),
   get: (id) => api.get(`/vehiculos/${id}`),
-  create: (data) => api.post('/vehiculos', data),
+  create: (data) => api.post('/vehiculos/', data),
   update: (id, data) => api.patch(`/vehiculos/${id}`, data),
   delete: (id) => api.delete(`/vehiculos/${id}`),
+  uploadDocumento: (id, tipo, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post(`/vehiculos/${id}/upload/${tipo}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  }
 }
 
 export const kilometrajeAPI = {
   list: (params) => api.get('/kilometraje/', { params }),
+  listVehiculos: () => api.get('/kilometraje/vehiculos'), 
   create: (data) => api.post('/kilometraje/', data),
-  update: (id, data) => api.patch(`/kilometraje/${id}`, data), 
-  delete: (id) => api.delete(`/kilometraje/${id}`),           
+  update: (id, data) => api.patch(`/kilometraje/${id}`, data),
+  delete: (id) => api.delete(`/kilometraje/${id}`)
 }
 
 export const choferesAPI = {
-  list: () => api.get('/choferes'),
+  list: (params) => api.get('/choferes/', { params }),
   get: (id) => api.get(`/choferes/${id}`),
-  create: (data) => api.post('/choferes', data),
+  create: (data) => api.post('/choferes/', data),
   update: (id, data) => api.put(`/choferes/${id}`, data),
   delete: (id) => api.delete(`/choferes/${id}`),
+  uploadDocumento: (id, tipo, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post(`/choferes/${id}/upload/${tipo}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  }
 }
 
 export const combustibleAPI = {

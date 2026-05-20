@@ -87,10 +87,11 @@ def obtener_kpis(db: Session = Depends(get_db)):
         })
 
     # ==========================================
-    # 5. ALERTAS (Solo Checklists Reprobados)
+    # 5. ALERTAS
     # ==========================================
     alertas = []
     
+    # 5.1 Checklists Reprobados
     checklists = db.query(Checklist, Vehiculo).join(Vehiculo).filter(
         Checklist.aprobado == False
     ).order_by(desc(Checklist.fecha)).limit(5).all()
@@ -102,6 +103,56 @@ def obtener_kpis(db: Session = Depends(get_db)):
             "desc": c.observaciones or "Fallas reportadas por el chofer",
             "tiempo": c.fecha.strftime('%d/%m %H:%M')
         })
+
+    # 5.2 Licencias de Conducir (Vencidas o por vencer en 30 días)
+    pronto_licencia = hoy + timedelta(days=30)
+    
+    choferes_alerta = db.query(Chofer).filter(
+        Chofer.activo == True,
+        Chofer.fecha_expiracion_licencia != None,
+        Chofer.fecha_expiracion_licencia <= pronto_licencia
+    ).all()
+
+    for c in choferes_alerta:
+        if c.fecha_expiracion_licencia < hoy:
+            alertas.append({
+                "tipo": "red",
+                "titulo": f"Licencia Caducada — {c.nombre} {c.apellido}",
+                "desc": f"La licencia expiró el {c.fecha_expiracion_licencia.strftime('%d/%m/%Y')}.",
+                "tiempo": "¡Acción urgente!"
+            })
+        else:
+            alertas.append({
+                "tipo": "amber",
+                "titulo": f"Licencia por Caducar — {c.nombre} {c.apellido}",
+                "desc": f"Vence el {c.fecha_expiracion_licencia.strftime('%d/%m/%Y')}.",
+                "tiempo": "Trámite pendiente"
+            })
+
+    # 5.3 Matrículas de Vehículos (Vencidas o por vencer en 30 días)
+    pronto_matricula = hoy + timedelta(days=30)
+    
+    vehiculos_alerta = db.query(Vehiculo).filter(
+        Vehiculo.activo == True,
+        Vehiculo.fecha_expiracion_matricula != None,
+        Vehiculo.fecha_expiracion_matricula <= pronto_matricula
+    ).all()
+
+    for v in vehiculos_alerta:
+        if v.fecha_expiracion_matricula < hoy:
+            alertas.append({
+                "tipo": "red",
+                "titulo": f"Matrícula Caducada — {v.placa or v.codigo}",
+                "desc": f"La matrícula expiró el {v.fecha_expiracion_matricula.strftime('%d/%m/%Y')}.",
+                "tiempo": "¡Vehículo inmovilizado!"
+            })
+        else:
+            alertas.append({
+                "tipo": "amber",
+                "titulo": f"Matrícula por Caducar — {v.placa or v.codigo}",
+                "desc": f"Vence el {v.fecha_expiracion_matricula.strftime('%d/%m/%Y')}.",
+                "tiempo": "Agendar revisión"
+            })
 
     return {
         "vehiculos_operativos": operativos,

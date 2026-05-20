@@ -36,7 +36,6 @@ class Usuario(Base):
     activo = Column(Boolean, default=True)
     creado_en = Column(DateTime(timezone=True), server_default=func.now())
 
-
 class Chofer(Base):
     __tablename__ = "choferes"
     id = Column(Integer, primary_key=True, index=True)
@@ -48,7 +47,9 @@ class Chofer(Base):
     telefono = Column(String(20))
     activo = Column(Boolean, default=True)
     creado_en = Column(DateTime(timezone=True), server_default=func.now())
-
+    foto_url = Column(String(500), nullable=True)
+    licencia_url = Column(String(500), nullable=True)
+    fecha_expiracion_licencia = Column(Date, nullable=True)
     asignaciones = relationship("Asignacion", back_populates="chofer")
     checklists = relationship("Checklist", back_populates="chofer")
 
@@ -56,7 +57,7 @@ class Chofer(Base):
 class Vehiculo(Base):
     __tablename__ = "vehiculos"
     id = Column(Integer, primary_key=True, index=True)
-    placa = Column(String(20), unique=True, index=True, nullable=False) # AHORA ES LA REINA
+    placa = Column(String(20), unique=True, index=True, nullable=False) 
     marca = Column(String(80))
     modelo = Column(String(80))
     anio = Column(Integer)
@@ -67,7 +68,9 @@ class Vehiculo(Base):
     activo = Column(Boolean, default=True)
     creado_en = Column(DateTime(timezone=True), server_default=func.now())
     actualizado_en = Column(DateTime(timezone=True), onupdate=func.now())
-
+    foto_url = Column(String(500), nullable=True)
+    matricula_url = Column(String(500), nullable=True)
+    fecha_expiracion_matricula = Column(Date, nullable=True)
     asignaciones = relationship("Asignacion", back_populates="vehiculo")
     tanqueos = relationship("Tanqueo", back_populates="vehiculo")
     mantenimientos = relationship("Mantenimiento", back_populates="vehiculo")

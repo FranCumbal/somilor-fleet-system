@@ -1,6 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List, Optional
+import shutil
+import os
+from uuid import uuid4
+
 from app.database import get_db
 from app.models import Vehiculo, EstadoVehiculo
 from app.schemas import VehiculoCreate, VehiculoOut, VehiculoUpdate
@@ -63,3 +67,36 @@ def desactivar_vehiculo(vehiculo_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Vehículo no encontrado")
     v.activo = False
     db.commit()
+
+@router.post("/{vehiculo_id}/upload/{tipo}", response_model=VehiculoOut)
+def subir_documento(vehiculo_id: int, tipo: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    if tipo not in ["foto", "matricula"]:
+        raise HTTPException(status_code=400, detail="El tipo de documento debe ser 'foto' o 'matricula'")
+        
+    v = db.query(Vehiculo).filter(Vehiculo.id == vehiculo_id).first()
+    if not v:
+        raise HTTPException(status_code=404, detail="Vehículo no encontrado")
+
+    ext = file.filename.split(".")[-1]
+    filename = f"{uuid4().hex}.{ext}"
+    filepath = f"uploads/vehiculos/{filename}"
+
+    with open(filepath, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    url = f"/uploads/vehiculos/{filename}"
+    
+    if tipo == "foto":
+        if v.foto_url and os.path.exists(v.foto_url.lstrip("/")):
+            try: os.remove(v.foto_url.lstrip("/"))
+            except: pass
+        v.foto_url = url
+    else:
+        if v.matricula_url and os.path.exists(v.matricula_url.lstrip("/")):
+            try: os.remove(v.matricula_url.lstrip("/"))
+            except: pass
+        v.matricula_url = url
+        
+    db.commit()
+    db.refresh(v)
+    return v

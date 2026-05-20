@@ -35,11 +35,14 @@ class ChoferBase(BaseModel):
     codigo_trabajador: Optional[str] = None 
     categoria_licencia: Optional[str] = None
     telefono: Optional[str] = None
+    fecha_expiracion_licencia: Optional[date] = None 
 
 class ChoferCreate(ChoferBase): pass
 
 class ChoferOut(ChoferBase):
     id: int
+    foto_url: Optional[str] = None      
+    licencia_url: Optional[str] = None  
     activo: bool
     creado_en: datetime
     class Config: from_attributes = True
@@ -54,20 +57,23 @@ class VehiculoBase(BaseModel):
     color: Optional[str] = None
     tipo: TipoVehiculo
     kilometraje_actual: float = 0
+    fecha_expiracion_matricula: Optional[date] = None 
 
 class VehiculoCreate(VehiculoBase): pass
 
 class VehiculoUpdate(BaseModel):
     estado: Optional[EstadoVehiculo] = None
     kilometraje_actual: Optional[float] = None
+    fecha_expiracion_matricula: Optional[date] = None 
 
 class VehiculoOut(VehiculoBase):
     id: int
     estado: EstadoVehiculo
+    foto_url: Optional[str] = None     
+    matricula_url: Optional[str] = None  
     activo: bool
     creado_en: datetime
     class Config: from_attributes = True
-
 
 # ── ASIGNACION ────────────────────────────────
 class AsignacionCreate(BaseModel):

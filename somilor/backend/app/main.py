@@ -1,9 +1,21 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+import os
+
 from app.config import settings
 from app.database import Base, engine
-from app.routers import auth, vehiculos, choferes, combustible, mantenimiento, checklist, dashboard, asignaciones, personal, generacion
-from app.routers import auth, vehiculos, choferes, combustible, mantenimiento, checklist, dashboard, asignaciones, personal, generacion, kilometraje
+from app.routers import (
+    auth, vehiculos, choferes, combustible, mantenimiento, 
+    checklist, dashboard, asignaciones, personal, generacion, kilometraje
+)
+
+# ==========================================
+# 1. CREAR CARPETA FÍSICA PARA SUBIDAS
+# ==========================================
+
+os.makedirs("uploads/choferes", exist_ok=True)
+os.makedirs("uploads/vehiculos", exist_ok=True)
 
 Base.metadata.create_all(bind=engine)
 
@@ -12,6 +24,12 @@ app = FastAPI(
     description="API REST para el Sistema de Gestión de Flotas SOMILOR",
     version="1.0.0",
 )
+
+# ==========================================
+# 2. SERVIR ARCHIVOS ESTÁTICOS
+# ==========================================
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -30,8 +48,8 @@ app.include_router(mantenimiento.router, prefix=PREFIX)
 app.include_router(checklist.router, prefix=PREFIX)
 app.include_router(dashboard.router, prefix=PREFIX)
 app.include_router(asignaciones.router, prefix=PREFIX)
-app.include_router(personal.router,    prefix=PREFIX)
-app.include_router(generacion.router,  prefix=PREFIX)
+app.include_router(personal.router, prefix=PREFIX)
+app.include_router(generacion.router, prefix=PREFIX)
 app.include_router(kilometraje.router, prefix=PREFIX)
 
 @app.get("/")
