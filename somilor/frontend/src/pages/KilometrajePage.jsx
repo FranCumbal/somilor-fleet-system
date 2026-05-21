@@ -84,12 +84,13 @@ export default function KilometrajePage() {
 
   const handleExportarPDF = () => {
     const columnas = [
-      { header: 'Fecha de Registro', render: (fila) => new Date(fila.fecha).toLocaleDateString('es-EC') },
-      { header: 'Unidad', render: (fila) => fila.vehiculo?.placa || `V-${fila.vehiculo_id}` },
-      { header: 'Kilometraje Registrado', render: (fila) => `${fila.kilometraje} km` },
-      { header: 'Observaciones', dataKey: 'observaciones' }
+      { header: 'Placa', dataKey: 'placa' },
+      { header: 'Vehículo (Marca y Modelo)', render: (fila) => `${fila.marca} ${fila.modelo}` },
+      { header: 'Uso Actual', render: (fila) => `${fila.kilometraje_actual.toLocaleString()} km` },
+      { header: 'Estado', render: (fila) => fila.estado ? fila.estado.toUpperCase() : '—' }
     ];
-    generarPDF('Historial de Kilometraje', columnas, kilometrajesFiltrados, 'Kilometraje_SOMILOR');
+  
+    generarPDF('Control de Kilometraje Actual', columnas, vehiculosFiltrados, 'Kilometraje_SOMILOR');
   };
 
   return (

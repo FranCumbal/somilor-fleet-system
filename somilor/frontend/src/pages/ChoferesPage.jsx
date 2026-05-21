@@ -226,7 +226,7 @@ export default function ChoferesPage() {
                   { key:'apellido',           label:'Apellidos *',                  ph:'Ej: Mendoza' },
                   { key:'cedula',             label:'Número de Cédula *',           ph:'Ej: 0912345678', isNumeric:true, maxLen:10 },
                   { key:'codigo_trabajador',  label:'Cód. de Trabajo * (4 dígitos)',ph:'Ej: 1234',       isNumeric:true, maxLen:4 },
-                  { key:'categoria_licencia', label:'Categoría de Licencia',        type:'select',       options:CATEGORIAS_LICENCIA },
+                  { key:'categoria_licencia', label:'Categorías de Licencia',       type:'multiselect',  options:CATEGORIAS_LICENCIA },
                   { key:'telefono',           label:'Teléfono de Contacto',         ph:'Ej: 0991234567', isNumeric:true, maxLen:10 },
                   { key:'fecha_expiracion_licencia', label:'Vencimiento de Licencia', type:'date' },
                 ].map(campo => (
@@ -239,6 +239,43 @@ export default function ChoferesPage() {
                         <option value="">Seleccione...</option>
                         {campo.options.map(opt => <option key={opt} value={opt}>Tipo {opt}</option>)}
                       </select>
+                    ) : campo.type === 'multiselect' ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        {campo.options.map(opt => {
+                          const valoresActuales = (f[campo.key] || '').split(' ').filter(Boolean);
+                          const estaSeleccionado = valoresActuales.includes(opt);
+                          
+                          return (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => {
+                                let nuevos = [...valoresActuales];
+                                if (estaSeleccionado) {
+                                  nuevos = nuevos.filter(v => v !== opt); 
+                                } else {
+                                  nuevos.push(opt); 
+                                }
+                                updateField(f.idRef, campo.key, nuevos.sort().join(' '));
+                              }}
+                              style={{
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                fontFamily: 'Space Mono',
+                                border: estaSeleccionado ? '1px solid var(--gold)' : '1px solid var(--border-soft)',
+                                background: estaSeleccionado ? 'rgba(200,168,75,0.15)' : 'var(--panel2)',
+                                color: estaSeleccionado ? 'var(--gold-light)' : 'var(--text-2)',
+                                transition: 'all 0.2s ease'
+                              }}
+                            >
+                              {opt}
+                            </button>
+                          );
+                        })}
+                      </div>
                     ) : campo.type === 'date' ? (
                       <input type="date" value={f[campo.key] || ''}
                         onChange={e => updateField(f.idRef, campo.key, e.target.value)}
