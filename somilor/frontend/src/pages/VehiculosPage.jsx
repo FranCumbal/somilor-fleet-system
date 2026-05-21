@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { vehiculosAPI } from '../services/api'
 import { Panel, PanelHeader, PageHeader, Btn, LoadingSpinner, EmptyState, StatusPill } from '../components/layout/UI'
+import { generarPDF } from '../utils/exportPdf'
 
 const idUnico = () => Math.random().toString(36).substr(2, 9)
 // 1. Añadimos fecha_expiracion_matricula al estado inicial
@@ -168,17 +169,38 @@ export default function VehiculosPage() {
     </div>
   ) : null
 
+  const handleExportarPDF = () => {
+    const columnas = [
+      { header: 'Placa/Código', dataKey: 'placa' },
+      { header: 'Marca', dataKey: 'marca' },
+      { header: 'Modelo', dataKey: 'modelo' },
+      { header: 'Tipo', render: (fila) => fila.tipo ? fila.tipo.toUpperCase() : '—' },
+      { header: 'Estado', render: (fila) => fila.estado ? fila.estado.toUpperCase() : '—' },
+      { header: 'Kilometraje', render: (fila) => `${fila.kilometraje_actual || 0} km` }
+    ];
+    generarPDF('Inventario de Flota', columnas, vehiculosFiltrados, 'Flota_SOMILOR');
+  };
+
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:20, minWidth:0, width:'100%', position:'relative' }}>
-      <PageHeader title="Inventario de Flota" subtitle={`${stats.total} unidades registradas en la empresa`}>
+      {/* REEMPLAZA DESDE <PageHeader> HASTA </PageHeader> POR ESTO: */}
+      <PageHeader title="Inventario de Flota" subtitle="Gestión de unidades y maquinaria">
         {!showForm && (
-          <input type="text" placeholder="Buscar unidad..." value={busqueda}
+          <input type="text" placeholder="Buscar..." value={busqueda}
             onChange={e => setBusqueda(e.target.value)}
             style={{ background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'5px 12px', color:'var(--text-1)', fontSize:12, outline:'none', width:160, fontFamily:'DM Sans' }}
           />
         )}
+        
+        {/* Nuevo botón de exportar */}
+        {!showForm && (
+          <Btn variant="ghost" onClick={handleExportarPDF} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            📄 Exportar PDF
+          </Btn>
+        )}
+
         <Btn variant={showForm ? 'ghost' : 'primary'} onClick={() => { cerrarFormulario(); setShowForm(!showForm) }}>
-          {showForm ? 'Volver al inventario' : '+ Nueva unidad'}
+          {showForm ? 'Volver al inventario' : '+ Nuevo vehículo'}
         </Btn>
       </PageHeader>
 

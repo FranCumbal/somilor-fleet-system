@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { choferesAPI } from '../services/api'
 import { Panel, PanelHeader, PageHeader, Btn, LoadingSpinner, EmptyState } from '../components/layout/UI'
+import { generarPDF } from '../utils/exportPdf'
 
 const idUnico = () => Math.random().toString(36).substr(2, 9)
 // Estado inicial corregido: usa codigo_trabajador y tiene fecha_expiracion_licencia
@@ -174,6 +175,17 @@ export default function ChoferesPage() {
     </div>
   ) : null
 
+  const handleExportarPDF = () => {
+    const columnas = [
+      { header: 'Nombres', dataKey: 'nombre' },
+      { header: 'Apellidos', dataKey: 'apellido' },
+      { header: 'Cédula', dataKey: 'cedula' },
+      { header: 'Licencia', dataKey: 'categoria_licencia' },
+      { header: 'Teléfono', dataKey: 'telefono' }
+    ];
+    generarPDF('Directorio de Choferes Filtrados', columnas, choferesFiltrados, 'Choferes_SOMILOR');
+  };
+
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:20, minWidth:0, width:'100%', position:'relative' }}>
       <PageHeader title="Directorio de Choferes" subtitle={`${stats.total} choferes registrados en la nómina`}>
@@ -183,6 +195,14 @@ export default function ChoferesPage() {
             style={{ background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'5px 12px', color:'var(--text-1)', fontSize:12, outline:'none', width:160, fontFamily:'DM Sans' }}
           />
         )}
+        
+        {/* Nuevo botón de exportar */}
+        {!showForm && (
+          <Btn variant="ghost" onClick={handleExportarPDF} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            📄 Exportar PDF
+          </Btn>
+        )}
+
         <Btn variant={showForm ? 'ghost' : 'primary'} onClick={() => { cerrarFormulario(); setShowForm(!showForm) }}>
           {showForm ? 'Volver al directorio' : '+ Nuevo chofer'}
         </Btn>

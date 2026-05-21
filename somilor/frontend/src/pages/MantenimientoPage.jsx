@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { mantenimientoAPI, vehiculosAPI } from '../services/api'
 import { Panel, PanelHeader, PageHeader, Btn, StatusPill, Chip, LoadingSpinner, EmptyState } from '../components/layout/UI'
+import { generarPDF } from '../utils/exportPdf'
 
 const idUnico = () => Math.random().toString(36).substr(2, 9)
 const estadoInicialForm = { tipo_vehiculo:'', vehiculo_id:'', tipo:'preventivo', descripcion:'', fecha_programada:'', km_programado:'', taller:'', costo:'', observaciones:'' }
@@ -211,11 +212,36 @@ export default function MantenimientoPage() {
     </div>
   ) : null
 
+  const handleExportarPDF = () => {
+    const columnas = [
+      { header: 'F. Programada', render: (fila) => fila.fecha_programada ? new Date(fila.fecha_programada).toLocaleDateString('es-EC') : '—' },
+      { header: 'Unidad', render: (fila) => fila.vehiculo?.placa || `V-${fila.vehiculo_id}` },
+      { header: 'Tipo', render: (fila) => fila.tipo ? fila.tipo.toUpperCase() : '—' },
+      { header: 'Descripción', dataKey: 'descripcion' },
+      { header: 'Estado', render: (fila) => fila.estado ? fila.estado.replace('_', ' ').toUpperCase() : '—' },
+      { header: 'Taller', dataKey: 'taller' }
+    ];
+    generarPDF('Reporte de Mantenimientos', columnas, mantenimientosFiltrados, 'Mantenimiento_SOMILOR');
+  };
+
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:20, minWidth:0, width:'100%', position:'relative' }}>
-      <PageHeader title="Gestión de Mantenimiento" subtitle="Control preventivo y correctivo">
+      <PageHeader title="Mantenimientos" subtitle="Control preventivo y correctivo de la flota">
+        {!showForm && (
+          <input type="text" placeholder="Buscar..." value={busqueda}
+            onChange={e => setBusqueda(e.target.value)}
+            style={{ background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'5px 12px', color:'var(--text-1)', fontSize:12, outline:'none', width:160, fontFamily:'DM Sans' }}
+          />
+        )}
+
+        {!showForm && (
+          <Btn variant="ghost" onClick={handleExportarPDF} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            📄 Exportar PDF
+          </Btn>
+        )}
+
         <Btn variant={showForm ? 'ghost' : 'primary'} onClick={() => { cerrarFormulario(); setShowForm(!showForm) }}>
-          {showForm ? 'Volver al panel' : '+ Registrar mantenimiento'}
+          {showForm ? 'Volver al panel' : '+ Programar'}
         </Btn>
       </PageHeader>
 

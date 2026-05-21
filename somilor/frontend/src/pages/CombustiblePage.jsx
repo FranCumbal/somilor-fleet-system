@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { combustibleAPI, vehiculosAPI, choferesAPI } from '../services/api'
 import { Panel, PanelHeader, PageHeader, Btn, LoadingSpinner, EmptyState, Chip } from '../components/layout/UI'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { generarPDF } from '../utils/exportPdf'
 
 const idUnico = () => Math.random().toString(36).substr(2, 9)
 const getLocalNow = () => new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)
@@ -219,9 +220,29 @@ export default function CombustiblePage() {
     </div>
   ) : null
 
+  const handleExportarPDF = () => {
+    const columnas = [
+      { header: 'Fecha', render: (fila) => new Date(fila.fecha).toLocaleDateString('es-EC') },
+      { header: 'Unidad (Placa)', render: (fila) => fila.vehiculo?.placa || `V-${fila.vehiculo_id}` },
+      { header: 'Chofer', render: (fila) => fila.chofer ? `${fila.chofer.nombre} ${fila.chofer.apellido}` : 'Sin asignar' },
+      { header: 'Costo ($)', render: (fila) => `$${(fila.costo_total || 0).toFixed(2)}` },
+      { header: 'Observaciones', dataKey: 'observaciones' }
+    ];
+    // Pasamos tanqueosConBusqueda, que ya tiene los filtros de fecha y búsqueda aplicados
+    generarPDF(`Reporte de Combustible - ${periodoActivo.toUpperCase()}`, columnas, tanqueosConBusqueda, 'Combustible_SOMILOR');
+  };
+
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:20, minWidth:0, width:'100%', position:'relative' }}>
       <PageHeader title="Control Financiero de Flota" subtitle="Registro de gastos por abastecimiento">
+        
+        {/* Nuevo botón de exportar */}
+        {!showForm && (
+          <Btn variant="ghost" onClick={handleExportarPDF} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            📄 Exportar PDF
+          </Btn>
+        )}
+
         <Btn variant={showForm ? 'ghost' : 'primary'} onClick={() => { cerrarFormulario(); setShowForm(!showForm) }}>
           {showForm ? 'Volver al panel' : '+ Registrar Gasto'}
         </Btn>

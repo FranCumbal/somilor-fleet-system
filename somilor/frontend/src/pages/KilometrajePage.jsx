@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { kilometrajeAPI, vehiculosAPI } from '../services/api'
 import { Panel, PanelHeader, PageHeader, Btn, LoadingSpinner, EmptyState, StatusPill } from '../components/layout/UI'
 import { useAuth } from '../hooks/useAuth'
+import { generarPDF } from '../utils/exportPdf'
 
 const estadoInicial = { vehiculo_id: '', kilometraje: '', observaciones: '' }
 
@@ -81,20 +82,35 @@ export default function KilometrajePage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const handleExportarPDF = () => {
+    const columnas = [
+      { header: 'Fecha de Registro', render: (fila) => new Date(fila.fecha).toLocaleDateString('es-EC') },
+      { header: 'Unidad', render: (fila) => fila.vehiculo?.placa || `V-${fila.vehiculo_id}` },
+      { header: 'Kilometraje Registrado', render: (fila) => `${fila.kilometraje} km` },
+      { header: 'Observaciones', dataKey: 'observaciones' }
+    ];
+    generarPDF('Historial de Kilometraje', columnas, kilometrajesFiltrados, 'Kilometraje_SOMILOR');
+  };
+
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:20, minWidth:0, width:'100%' }}>
-      <PageHeader title="Control de Kilometraje" subtitle="Inventario de flota y bitácora de uso">
+      <PageHeader title="Control de Kilometraje" subtitle="Registro histórico de recorridos">
         {!showForm && (
-          <div style={{ display: 'flex', gap: 10 }}>
-            <input type="text" placeholder="Buscar unidad (placa, marca...)" value={busqueda}
-              onChange={e => setBusqueda(e.target.value)}
-              style={{ background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'8px 14px', color:'var(--text-1)', fontSize:13, outline:'none', width:220, fontFamily:'DM Sans' }}
-            />
-            <Btn variant="primary" onClick={() => { setShowForm(true); setForm({...estadoInicial}); }}>
-              + Registrar Km
-            </Btn>
-          </div>
+          <input type="text" placeholder="Buscar..." value={busqueda}
+            onChange={e => setBusqueda(e.target.value)}
+            style={{ background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'5px 12px', color:'var(--text-1)', fontSize:12, outline:'none', width:160, fontFamily:'DM Sans' }}
+          />
         )}
+
+        {!showForm && (
+          <Btn variant="ghost" onClick={handleExportarPDF} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            📄 Exportar PDF
+          </Btn>
+        )}
+
+        <Btn variant={showForm ? 'ghost' : 'primary'} onClick={() => { cerrarFormulario(); setShowForm(!showForm) }}>
+          {showForm ? 'Volver al historial' : '+ Registrar Km'}
+        </Btn>
       </PageHeader>
 
       {showForm ? (
