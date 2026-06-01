@@ -1,11 +1,18 @@
 import { useEffect, useState } from 'react'
 import { vehiculosAPI } from '../services/api'
 import { Panel, PanelHeader, PageHeader, Btn, LoadingSpinner, EmptyState, StatusPill } from '../components/layout/UI'
-import { generarPDF } from '../utils/exportPdf'
+import { generarPDF, generarFichaVehiculoPDF } from '../utils/exportPdf'
 
 const idUnico = () => Math.random().toString(36).substr(2, 9)
-// 1. Añadimos fecha_expiracion_matricula al estado inicial
-const estadoInicial = { placa:'', marca:'', modelo:'', anio:'', color:'', tipo:'liviano', kilometraje_actual:'', fecha_expiracion_matricula:'' }
+
+const estadoInicial = { 
+    placa:'', marca:'', modelo:'', anio:'', color:'', tipo:'liviano', kilometraje_actual:'', fecha_expiracion_matricula:'',
+    // Anverso
+    numero_especie:'', placa_anterior:'', fecha_matricula:'', clase_vehiculo:'', pais_origen:'', numero_motor:'', color_secundario:'', numero_chasis:'', carroceria:'', tipo_combustible:'', capacidad_pasajeros:'', tonelaje:'', cilindraje:'', observacion_matricula:'',
+    // Reverso
+    titular_nombres:'', titular_identificacion:'', titular_residencia:'', titular_direccion:'', titular_telefono:'', operadora_transporte:'', ruat:'', matricula_tipo_transporte:'', matricula_clase_transporte:'', numero_titulo_habilitante:'', ambito_transporte:'', total_matricula:'', digitador_matricula:'', avaluo_vehiculo:''
+}
+
 const TIPOS_VEHICULO = ['liviano', 'pesado', 'maquinaria']
 
 export default function VehiculosPage() {
@@ -14,10 +21,12 @@ export default function VehiculosPage() {
   const [showForm, setShowForm]       = useState(false)
   const [editandoId, setEditandoId]   = useState(null)
   const [formularios, setFormularios] = useState([{ idRef: idUnico(), ...estadoInicial }])
+  const [activeTab, setActiveTab]     = useState('base') 
   const [saving, setSaving]           = useState(false)
   const [error, setError]             = useState('')
   const [detalleActivo, setDetalleActivo] = useState(null)
   const [busqueda, setBusqueda]       = useState('')
+  const [imagenAmpliada, setImagenAmpliada] = useState(null)
   const [pagina, setPagina]           = useState(1)
   const POR_PAGINA                    = 15
 
@@ -45,7 +54,7 @@ export default function VehiculosPage() {
     e.preventDefault(); setSaving(true); setError('')
     for (const f of formularios) {
       if (!f.placa) {
-        setError(`La placa o código es obligatoria.`)
+        setError('La placa o código es obligatoria.')
         setSaving(false); return
       }
     }
@@ -53,14 +62,24 @@ export default function VehiculosPage() {
       if (editandoId) {
         const payload = { ...formularios[0] }
         delete payload.idRef
-        if(!payload.fecha_expiracion_matricula) payload.fecha_expiracion_matricula = null
+        
+        // 1. LIMPIEZA AUTOMÁTICA: Pasa los campos vacíos a 'null' para que la BD no falle
+        Object.keys(payload).forEach(key => {
+          if (payload[key] === '') payload[key] = null;
+        });
+
         payload.kilometraje_actual = payload.kilometraje_actual ? parseFloat(payload.kilometraje_actual) : 0
         await vehiculosAPI.update(editandoId, payload)
       } else {
         const promesas = formularios.map(f => {
           const payload = { ...f }
           delete payload.idRef
-          if(!payload.fecha_expiracion_matricula) payload.fecha_expiracion_matricula = null
+          
+          // 1. LIMPIEZA AUTOMÁTICA: Pasa los campos vacíos a 'null'
+          Object.keys(payload).forEach(key => {
+            if (payload[key] === '') payload[key] = null;
+          });
+
           payload.kilometraje_actual = payload.kilometraje_actual ? parseFloat(payload.kilometraje_actual) : 0
           return vehiculosAPI.create(payload)
         })
@@ -68,12 +87,16 @@ export default function VehiculosPage() {
       }
       cerrarFormulario(); cargar()
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al guardar. Verifica que las placas no estén repetidas.')
+      // 2. PREVENCIÓN DE PANTALLA NEGRA: Si el backend devuelve un arreglo de errores
+      const detail = err.response?.data?.detail;
+      const errorMsg = Array.isArray(detail) ? 'Error de validación. Revisa que los números y fechas tengan el formato correcto.' : (detail || 'Error al guardar. Verifica que las placas no estén repetidas.');
+      setError(errorMsg)
     } finally { setSaving(false) }
   }
 
   const cargarDatosEdicion = (v) => {
     setEditandoId(v.id)
+    setActiveTab('base') // Nos aseguramos de iniciar en la pestaña 1 al editar
     setFormularios([{
       idRef:                      idUnico(),
       placa:                      v.placa  || '',
@@ -83,7 +106,35 @@ export default function VehiculosPage() {
       color:                      v.color  || '',
       tipo:                       v.tipo   || 'liviano',
       kilometraje_actual:         v.kilometraje_actual || '',
-      fecha_expiracion_matricula: v.fecha_expiracion_matricula || '' 
+      fecha_expiracion_matricula: v.fecha_expiracion_matricula || '',
+      numero_especie:             v.numero_especie || '',
+      placa_anterior:             v.placa_anterior || '',
+      fecha_matricula:            v.fecha_matricula || '',
+      clase_vehiculo:             v.clase_vehiculo || '',
+      pais_origen:                v.pais_origen || '',
+      numero_motor:               v.numero_motor || '',
+      color_secundario:           v.color_secundario || '',
+      numero_chasis:              v.numero_chasis || '',
+      carroceria:                 v.carroceria || '',
+      tipo_combustible:           v.tipo_combustible || '',
+      capacidad_pasajeros:        v.capacidad_pasajeros || '',
+      tonelaje:                   v.tonelaje || '',
+      cilindraje:                 v.cilindraje || '',
+      observacion_matricula:      v.observacion_matricula || '',
+      titular_nombres:            v.titular_nombres || '',
+      titular_identificacion:     v.titular_identificacion || '',
+      titular_residencia:         v.titular_residencia || '',
+      titular_direccion:          v.titular_direccion || '',
+      titular_telefono:           v.titular_telefono || '',
+      operadora_transporte:       v.operadora_transporte || '',
+      ruat:                       v.ruat || '',
+      matricula_tipo_transporte:  v.matricula_tipo_transporte || '',
+      matricula_clase_transporte: v.matricula_clase_transporte || '',
+      numero_titulo_habilitante:  v.numero_titulo_habilitante || '',
+      ambito_transporte:          v.ambito_transporte || '',
+      total_matricula:            v.total_matricula || '',
+      digitador_matricula:        v.digitador_matricula || '',
+      avaluo_vehiculo:            v.avaluo_vehiculo || ''
     }])
     setShowForm(true)
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -101,7 +152,6 @@ export default function VehiculosPage() {
     }
   }
 
-  // 2. FUNCIÓN PARA MANEJAR LA SUBIDA DE FOTOS Y MATRÍCULAS
   const handleUploadDocumento = async (e, tipo, id) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -183,7 +233,6 @@ export default function VehiculosPage() {
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:20, minWidth:0, width:'100%', position:'relative' }}>
-      {/* REEMPLAZA DESDE <PageHeader> HASTA </PageHeader> POR ESTO: */}
       <PageHeader title="Inventario de Flota" subtitle="Gestión de unidades y maquinaria">
         {!showForm && (
           <input type="text" placeholder="Buscar..." value={busqueda}
@@ -192,10 +241,9 @@ export default function VehiculosPage() {
           />
         )}
         
-        {/* Nuevo botón de exportar */}
         {!showForm && (
           <Btn variant="ghost" onClick={handleExportarPDF} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            📄 Exportar PDF
+            📄 Exportar Lista General
           </Btn>
         )}
 
@@ -216,47 +264,75 @@ export default function VehiculosPage() {
                   </button>
                 )}
               </PanelHeader>
-              <div style={{ padding:20, display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:16 }}>
-                {[
-                  { key:'placa',   label:'Placa / Código *', ph:'Ej: PCV-1234' },
-                  { key:'marca',   label:'Marca',            ph:'Ej: Toyota' },
-                  { key:'modelo',  label:'Modelo',           ph:'Ej: Hilux' },
-                  { key:'anio',    label:'Año',              ph:'Ej: 2023', isNumeric:true, maxLen:4 },
-                  { key:'color',   label:'Color',            ph:'Ej: Blanco' },
-                  { key:'tipo',    label:'Tipo de Vehículo', type:'select', options:TIPOS_VEHICULO },
-                  { key:'kilometraje_actual', label:'Uso Actual (Km/Hrs)', ph:'Ej: 15000', isNumeric:true },
-                  { key:'fecha_expiracion_matricula', label:'Vencimiento Matrícula', type:'date' }, // 3. AÑADIDO
-                ].map(campo => (
-                  <div key={campo.key}>
-                    <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>{campo.label}</label>
-                    {campo.type === 'select' ? (
-                      <select value={f[campo.key]} onChange={e => updateField(f.idRef, campo.key, e.target.value)}
-                        required={campo.label.includes('*')}
-                        style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none', fontFamily:'DM Sans', textTransform:'capitalize' }}>
-                        {campo.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                      </select>
-                    ) : campo.type === 'date' ? (
-                      <input type="date" value={f[campo.key] || ''}
-                        onChange={e => updateField(f.idRef, campo.key, e.target.value)}
-                        required={campo.label.includes('*')}
-                        style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none', fontFamily:'DM Sans' }}
-                      />
-                    ) : (
-                      <input type="text" placeholder={campo.ph} value={f[campo.key]}
-                        onChange={e => {
-                          if (campo.isNumeric) {
-                            const val = e.target.value.replace(/[^\d.]/g, '').slice(0, campo.maxLen || 20)
-                            updateField(f.idRef, campo.key, val)
-                          } else {
-                            updateField(f.idRef, campo.key, e.target.value)
-                          }
-                        }}
-                        required={campo.label.includes('*')}
-                        style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none', fontFamily:'DM Sans' }}
-                      />
-                    )}
+
+              <div style={{ padding:20 }}>
+                {/* 1. CONTROL DE PESTAÑAS */}
+                <div style={{ display: 'flex', gap: '10px', borderBottom: '1px solid var(--border-soft)', marginBottom: '20px', paddingBottom: '10px', overflowX: 'auto' }}>
+                  <button type="button" onClick={() => setActiveTab('base')} style={{ padding: '8px 16px', borderRadius: '6px', background: activeTab === 'base' ? 'var(--gold)' : 'transparent', color: activeTab === 'base' ? '#0E1117' : 'var(--text-1)', border: 'none', cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap', transition: 'all 0.2s' }}>
+                    1. Datos Base
+                  </button>
+                  <button type="button" onClick={() => setActiveTab('tecnicos')} style={{ padding: '8px 16px', borderRadius: '6px', background: activeTab === 'tecnicos' ? 'var(--gold)' : 'transparent', color: activeTab === 'tecnicos' ? '#0E1117' : 'var(--text-1)', border: 'none', cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap', transition: 'all 0.2s' }}>
+                    2. Especificaciones Técnicas
+                  </button>
+                  <button type="button" onClick={() => setActiveTab('legales')} style={{ padding: '8px 16px', borderRadius: '6px', background: activeTab === 'legales' ? 'var(--gold)' : 'transparent', color: activeTab === 'legales' ? '#0E1117' : 'var(--text-1)', border: 'none', cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap', transition: 'all 0.2s' }}>
+                    3. Datos Legales (Matrícula)
+                  </button>
+                </div>
+
+                {/* 2. TARJETA 1: DATOS BASE */}
+                {activeTab === 'base' && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Placa Actual *</label><input type="text" value={f.placa} onChange={e => updateField(f.idRef, 'placa', e.target.value)} required style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Placa Anterior</label><input type="text" value={f.placa_anterior || ''} onChange={e => updateField(f.idRef, 'placa_anterior', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Marca</label><input type="text" value={f.marca || ''} onChange={e => updateField(f.idRef, 'marca', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Modelo</label><input type="text" value={f.modelo || ''} onChange={e => updateField(f.idRef, 'modelo', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Año</label><input type="number" value={f.anio || ''} onChange={e => updateField(f.idRef, 'anio', e.target.value ? parseInt(e.target.value) : '')} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Color 1</label><input type="text" value={f.color || ''} onChange={e => updateField(f.idRef, 'color', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Color 2</label><input type="text" value={f.color_secundario || ''} onChange={e => updateField(f.idRef, 'color_secundario', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>País de Origen</label><input type="text" value={f.pais_origen || ''} onChange={e => updateField(f.idRef, 'pais_origen', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Uso Actual (Km/Hrs)</label><input type="number" step="0.01" value={f.kilometraje_actual || ''} onChange={e => updateField(f.idRef, 'kilometraje_actual', e.target.value ? parseFloat(e.target.value) : '')} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
                   </div>
-                ))}
+                )}
+
+                {/* 3. TARJETA 2: ESPECIFICACIONES TÉCNICAS */}
+                {activeTab === 'tecnicos' && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                    <div>
+                      <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Tipo Vehículo *</label>
+                      <select value={f.tipo} onChange={e => updateField(f.idRef, 'tipo', e.target.value)} required style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13, textTransform:'capitalize' }}>
+                        {TIPOS_VEHICULO.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                    </div>
+                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Clase Matrícula</label><input type="text" value={f.clase_vehiculo || ''} onChange={e => updateField(f.idRef, 'clase_vehiculo', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Número de Especie</label><input type="text" value={f.numero_especie || ''} onChange={e => updateField(f.idRef, 'numero_especie', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Número de Motor</label><input type="text" value={f.numero_motor || ''} onChange={e => updateField(f.idRef, 'numero_motor', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Número de Chasis</label><input type="text" value={f.numero_chasis || ''} onChange={e => updateField(f.idRef, 'numero_chasis', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Carrocería</label><input type="text" value={f.carroceria || ''} onChange={e => updateField(f.idRef, 'carroceria', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Combustible</label><input type="text" value={f.tipo_combustible || ''} onChange={e => updateField(f.idRef, 'tipo_combustible', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Cilindraje (cc)</label><input type="number" step="0.01" value={f.cilindraje || ''} onChange={e => updateField(f.idRef, 'cilindraje', e.target.value ? parseFloat(e.target.value) : '')} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Tonelaje</label><input type="number" step="0.01" value={f.tonelaje || ''} onChange={e => updateField(f.idRef, 'tonelaje', e.target.value ? parseFloat(e.target.value) : '')} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Capacidad Pasajeros</label><input type="number" value={f.capacidad_pasajeros || ''} onChange={e => updateField(f.idRef, 'capacidad_pasajeros', e.target.value ? parseInt(e.target.value) : '')} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                  </div>
+                )}
+
+                {/* 4. TARJETA 3: DATOS LEGALES */}
+                {activeTab === 'legales' && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                    <div style={{ gridColumn: '1 / -1' }}><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Nombres Titular</label><input type="text" value={f.titular_nombres || ''} onChange={e => updateField(f.idRef, 'titular_nombres', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>C.I. / RUC</label><input type="text" value={f.titular_identificacion || ''} onChange={e => updateField(f.idRef, 'titular_identificacion', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Teléfono</label><input type="text" value={f.titular_telefono || ''} onChange={e => updateField(f.idRef, 'titular_telefono', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div style={{ gridColumn: '1 / -1' }}><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Dirección / Residencia</label><input type="text" value={f.titular_direccion || ''} onChange={e => updateField(f.idRef, 'titular_direccion', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div style={{ gridColumn: '1 / -1' }}><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Operadora de Transporte</label><input type="text" value={f.operadora_transporte || ''} onChange={e => updateField(f.idRef, 'operadora_transporte', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>No. Título Habilitante</label><input type="text" value={f.numero_titulo_habilitante || ''} onChange={e => updateField(f.idRef, 'numero_titulo_habilitante', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>RUAT</label><input type="text" value={f.ruat || ''} onChange={e => updateField(f.idRef, 'ruat', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Fecha Matrícula</label><input type="date" value={f.fecha_matricula || ''} onChange={e => updateField(f.idRef, 'fecha_matricula', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Fecha Caducidad</label><input type="date" value={f.fecha_expiracion_matricula || ''} onChange={e => updateField(f.idRef, 'fecha_expiracion_matricula', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Total Matrícula ($)</label><input type="number" step="0.01" value={f.total_matricula || ''} onChange={e => updateField(f.idRef, 'total_matricula', e.target.value ? parseFloat(e.target.value) : '')} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Avalúo ($)</label><input type="number" step="0.01" value={f.avaluo_vehiculo || ''} onChange={e => updateField(f.idRef, 'avaluo_vehiculo', e.target.value ? parseFloat(e.target.value) : '')} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Digitador</label><input type="text" value={f.digitador_matricula || ''} onChange={e => updateField(f.idRef, 'digitador_matricula', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                    <div style={{ gridColumn: '1 / -1' }}><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Observaciones</label><input type="text" value={f.observacion_matricula || ''} onChange={e => updateField(f.idRef, 'observacion_matricula', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
+                  </div>
+                )}
               </div>
             </Panel>
           ))}
@@ -316,9 +392,15 @@ export default function VehiculosPage() {
                     onMouseOver={e => { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.background='var(--panel2)' }}
                     onMouseOut={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.background='var(--panel)' }}>
                     <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:16 }}>
-                      {/* 4. VISUALIZACIÓN DE FOTO DE VEHÍCULO */}
                       {v.foto_url ? (
-                        <img src={`http://${window.location.hostname}:8000${v.foto_url}`} alt="Foto" style={{ width: 50, height: 50, objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--border)' }} />
+                        <img 
+                          src={`http://${window.location.hostname}:8000${v.foto_url}`} 
+                          alt="Foto" 
+                          onClick={(e) => { e.stopPropagation(); setImagenAmpliada(`http://${window.location.hostname}:8000${v.foto_url}`) }}
+                          style={{ width: 50, height: 50, objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--border)', cursor: 'zoom-in', transition: 'transform 0.2s' }} 
+                          onMouseOver={e => e.currentTarget.style.transform = 'scale(1.05)'}
+                          onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
+                        />
                       ) : (
                         <div style={{ width:50, height:50, borderRadius:'8px', background:'rgba(200,168,75,0.15)', border:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0 }}>
                           {v.tipo === 'maquinaria' ? '🚜' : '🚛'}
@@ -364,7 +446,7 @@ export default function VehiculosPage() {
         <div onClick={() => setDetalleActivo(null)}
           style={{ position:'fixed', top:0, left:0, width:'100vw', height:'100vh', background:'rgba(10,12,17,0.85)', backdropFilter:'blur(5px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:10000, animation:'fadeInModal 0.2s ease-out', padding:'20px' }}>
           <div onClick={e => e.stopPropagation()}
-            style={{ width:'100%', maxWidth:Array.isArray(detalleActivo.data) ? '700px' : '450px', background:'var(--panel)', borderRadius:16, padding:'30px', border:'1px solid var(--border-soft)', boxShadow:'0 20px 50px rgba(0,0,0,0.5)', maxHeight:'90vh', overflowY:'auto' }}>
+            style={{ width:'100%', maxWidth:Array.isArray(detalleActivo.data) ? '700px' : '550px', background:'var(--panel)', borderRadius:16, padding:'30px', border:'1px solid var(--border-soft)', boxShadow:'0 20px 50px rgba(0,0,0,0.5)', maxHeight:'90vh', overflowY:'auto' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20, paddingBottom:15, borderBottom:'1px solid var(--border-soft)' }}>
               <h2 style={{ margin:0, color:'var(--gold-light)', fontSize:18 }}>{detalleActivo.tipo}</h2>
               <button onClick={() => setDetalleActivo(null)} style={{ background:'transparent', border:'none', color:'var(--text-3)', fontSize:24, cursor:'pointer' }}>×</button>
@@ -399,25 +481,36 @@ export default function VehiculosPage() {
                 </div>
               ) : (
                 <div>
-                  {/* 5. MODAL DE FICHA INDIVIDUAL CON UPLOAD */}
-                  <div style={{ display:'flex', alignItems:'center', gap:15, marginBottom:25 }}>
-                    <div style={{ position: 'relative' }}>
-                      {detalleActivo.data.foto_url ? (
-                        <img src={`http://${window.location.hostname}:8000${detalleActivo.data.foto_url}`} alt="Foto" style={{ width: 70, height: 70, objectFit: 'cover', borderRadius: '8px', border: '2px solid var(--gold)' }} />
-                      ) : (
-                        <div style={{ width:70, height:70, borderRadius:'8px', background:'var(--panel2)', border:'2px solid var(--gold)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:28, flexShrink:0 }}>
-                          {detalleActivo.data.tipo === 'maquinaria' ? '🚜' : '🚛'}
-                        </div>
-                      )}
-                      <label style={{ position: 'absolute', bottom: -5, right: -5, background: 'var(--panel3)', cursor: 'pointer', padding: '4px', borderRadius: '50%', border: '1px solid var(--border)', fontSize: 12 }} title="Cambiar foto">
-                        📷
-                        <input type="file" style={{ display: 'none' }} accept="image/*" onChange={(e) => handleUploadDocumento(e, 'foto', detalleActivo.data.id)} />
-                      </label>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent: 'space-between', marginBottom:25 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:15 }}>
+                      <div style={{ position: 'relative' }}>
+                        {detalleActivo.data.foto_url ? (
+                          <img 
+                            src={`http://${window.location.hostname}:8000${detalleActivo.data.foto_url}`} 
+                            alt="Foto" 
+                            onClick={(e) => { e.stopPropagation(); setImagenAmpliada(`http://${window.location.hostname}:8000${detalleActivo.data.foto_url}`) }}
+                            style={{ width: 70, height: 70, objectFit: 'cover', borderRadius: '8px', border: '2px solid var(--gold)', cursor: 'zoom-in' }} 
+                          />
+                        ) : (
+                          <div style={{ width:70, height:70, borderRadius:'8px', background:'var(--panel2)', border:'2px solid var(--gold)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:28, flexShrink:0 }}>
+                            {detalleActivo.data.tipo === 'maquinaria' ? '🚜' : '🚛'}
+                          </div>
+                        )}
+                        <label style={{ position: 'absolute', bottom: -5, right: -5, background: 'var(--panel3)', cursor: 'pointer', padding: '4px', borderRadius: '50%', border: '1px solid var(--border)', fontSize: 12 }} title="Cambiar foto">
+                          📷
+                          <input type="file" style={{ display: 'none' }} accept="image/*" onChange={(e) => handleUploadDocumento(e, 'foto', detalleActivo.data.id)} />
+                        </label>
+                      </div>
+                      <div>
+                        <div style={{ fontSize:24, fontWeight:'bold', color:'#fff', fontFamily:'Space Mono' }}>{detalleActivo.data.placa}</div>
+                        <div style={{ fontSize:13, color:'var(--gold-light)', marginTop:4 }}>{detalleActivo.data.marca} {detalleActivo.data.modelo} ({detalleActivo.data.anio || 'N/A'})</div>
+                      </div>
                     </div>
-                    <div>
-                      <div style={{ fontSize:24, fontWeight:'bold', color:'#fff', fontFamily:'Space Mono' }}>{detalleActivo.data.placa}</div>
-                      <div style={{ fontSize:13, color:'var(--gold-light)', marginTop:4 }}>{detalleActivo.data.marca} {detalleActivo.data.modelo} ({detalleActivo.data.anio || 'N/A'})</div>
-                    </div>
+                    
+                    {/* BOTÓN PARA EXPORTAR FICHA INDIVIDUAL PDF */}
+                    <Btn variant="primary" onClick={() => generarFichaVehiculoPDF(detalleActivo.data)} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      📄 Ficha PDF
+                    </Btn>
                   </div>
                   
                   <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:15, marginBottom:20 }}>
@@ -441,8 +534,8 @@ export default function VehiculosPage() {
                     <div><strong style={{ color:'#fff' }}>Categoría:</strong><span style={{ float:'right', color:'var(--gold-light)', textTransform:'capitalize' }}>{detalleActivo.data.tipo}</span></div>
                     <div><strong style={{ color:'#fff' }}>Color:</strong><span style={{ float:'right' }}>{detalleActivo.data.color || 'No especificado'}</span></div>
                     <div><strong style={{ color:'#fff' }}>Ingreso al sistema:</strong><span style={{ float:'right' }}>{new Date(detalleActivo.data.creado_en).toLocaleDateString('es-EC')}</span></div>
+                    <div><strong style={{ color:'#fff' }}>Propietario / Titular:</strong><span style={{ float:'right' }}>{detalleActivo.data.titular_nombres || 'No registrado'}</span></div>
 
-                    {/* ZONA PARA SUBIR ARCHIVO PDF / IMAGEN DE MATRÍCULA */}
                     <div style={{ marginTop:10, paddingTop:10, borderTop:'1px solid var(--border-soft)' }}>
                       <strong style={{ color:'#fff', display: 'block', marginBottom: 10 }}>Documento de Matrícula:</strong>
                       {detalleActivo.data.matricula_url ? (
@@ -465,6 +558,20 @@ export default function VehiculosPage() {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* MODAL PARA IMAGEN AMPLIADA */}
+      {imagenAmpliada && (
+        <div 
+          onClick={() => setImagenAmpliada(null)}
+          style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(10,12,17,0.9)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999999, cursor: 'zoom-out', padding: '20px' }}
+        >
+          <img 
+            src={imagenAmpliada} 
+            alt="Vista ampliada" 
+            style={{ width: '100%', height: '85vh', maxWidth: '900px', borderRadius: '12px', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', objectFit: 'contain', animation: 'fadeInModal 0.2s ease-out' }} 
+          />
         </div>
       )}
 

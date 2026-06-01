@@ -50,21 +50,82 @@ class ChoferOut(ChoferBase):
 
 # ── VEHICULO ──────────────────────────────────
 class VehiculoBase(BaseModel):
-    placa: str 
+    placa: str
     marca: Optional[str] = None
     modelo: Optional[str] = None
     anio: Optional[int] = None
     color: Optional[str] = None
     tipo: TipoVehiculo
     kilometraje_actual: float = 0
-    fecha_expiracion_matricula: Optional[date] = None 
+    fecha_expiracion_matricula: Optional[date] = None
+    
+    # Anverso Matrícula
+    numero_especie: Optional[str] = None
+    placa_anterior: Optional[str] = None
+    fecha_matricula: Optional[date] = None
+    clase_vehiculo: Optional[str] = None
+    pais_origen: Optional[str] = None
+    numero_motor: Optional[str] = None
+    color_secundario: Optional[str] = None
+    numero_chasis: Optional[str] = None
+    carroceria: Optional[str] = None
+    tipo_combustible: Optional[str] = None
+    capacidad_pasajeros: Optional[int] = None
+    tonelaje: Optional[float] = None
+    cilindraje: Optional[float] = None
+    observacion_matricula: Optional[str] = None
+
+    # Reverso Matrícula
+    titular_nombres: Optional[str] = None
+    titular_identificacion: Optional[str] = None
+    titular_residencia: Optional[str] = None
+    titular_direccion: Optional[str] = None
+    titular_telefono: Optional[str] = None
+    operadora_transporte: Optional[str] = None
+    ruat: Optional[str] = None
+    matricula_tipo_transporte: Optional[str] = None
+    matricula_clase_transporte: Optional[str] = None
+    numero_titulo_habilitante: Optional[str] = None
+    ambito_transporte: Optional[str] = None
+    total_matricula: Optional[float] = None
+    digitador_matricula: Optional[str] = None
+    avaluo_vehiculo: Optional[float] = None
 
 class VehiculoCreate(VehiculoBase): pass
 
 class VehiculoUpdate(BaseModel):
     estado: Optional[EstadoVehiculo] = None
     kilometraje_actual: Optional[float] = None
-    fecha_expiracion_matricula: Optional[date] = None 
+    fecha_expiracion_matricula: Optional[date] = None
+    
+    numero_especie: Optional[str] = None
+    placa_anterior: Optional[str] = None
+    fecha_matricula: Optional[date] = None
+    clase_vehiculo: Optional[str] = None
+    pais_origen: Optional[str] = None
+    numero_motor: Optional[str] = None
+    color_secundario: Optional[str] = None
+    numero_chasis: Optional[str] = None
+    carroceria: Optional[str] = None
+    tipo_combustible: Optional[str] = None
+    capacidad_pasajeros: Optional[int] = None
+    tonelaje: Optional[float] = None
+    cilindraje: Optional[float] = None
+    observacion_matricula: Optional[str] = None
+    titular_nombres: Optional[str] = None
+    titular_identificacion: Optional[str] = None
+    titular_residencia: Optional[str] = None
+    titular_direccion: Optional[str] = None
+    titular_telefono: Optional[str] = None
+    operadora_transporte: Optional[str] = None
+    ruat: Optional[str] = None
+    matricula_tipo_transporte: Optional[str] = None
+    matricula_clase_transporte: Optional[str] = None
+    numero_titulo_habilitante: Optional[str] = None
+    ambito_transporte: Optional[str] = None
+    total_matricula: Optional[float] = None
+    digitador_matricula: Optional[str] = None
+    avaluo_vehiculo: Optional[float] = None
 
 class VehiculoOut(VehiculoBase):
     id: int

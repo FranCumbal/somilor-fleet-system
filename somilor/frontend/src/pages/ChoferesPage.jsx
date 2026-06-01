@@ -20,6 +20,7 @@ export default function ChoferesPage() {
   const [busqueda, setBusqueda]       = useState('')
   const [pagina, setPagina]           = useState(1)
   const POR_PAGINA                    = 15
+  const [imagenAmpliada, setImagenAmpliada] = useState(null)
 
   const cargar = () => {
     setLoading(true)
@@ -359,7 +360,14 @@ export default function ChoferesPage() {
                     <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:16 }}>
                       {/* VISUALIZACIÓN DE FOTO EN TARJETAS PRINCIPALES */}
                       {c.foto_url ? (
-                        <img src={`http://${window.location.hostname}:8000${c.foto_url}`} alt="Foto" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: '50%', border: '1px solid var(--border)' }} />
+                        <img 
+                          src={`http://${window.location.hostname}:8000${c.foto_url}`} 
+                          alt="Foto" 
+                          onClick={(e) => { e.stopPropagation(); setImagenAmpliada(`http://${window.location.hostname}:8000${c.foto_url}`) }}
+                          style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: '50%', border: '1px solid var(--border)', cursor: 'zoom-in', transition: 'transform 0.2s' }} 
+                          onMouseOver={e => e.currentTarget.style.transform = 'scale(1.05)'}
+                          onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
+                        />
                       ) : (
                         <div style={{ width:44, height:44, borderRadius:'50%', background:'rgba(200,168,75,0.15)', border:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Space Mono', fontSize:14, fontWeight:700, color:'var(--gold-light)', flexShrink:0 }}>
                           {iniciales(c)}
@@ -447,7 +455,12 @@ export default function ChoferesPage() {
                   <div style={{ display:'flex', alignItems:'center', gap:15, marginBottom:25 }}>
                     <div style={{ position: 'relative' }}>
                       {detalleActivo.data.foto_url ? (
-                        <img src={`http://${window.location.hostname}:8000${detalleActivo.data.foto_url}`} alt="Foto" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: '50%', border: '2px solid var(--gold)' }} />
+                        <img 
+                          src={`http://${window.location.hostname}:8000${detalleActivo.data.foto_url}`} 
+                          alt="Foto" 
+                          onClick={(e) => { e.stopPropagation(); setImagenAmpliada(`http://${window.location.hostname}:8000${detalleActivo.data.foto_url}`) }}
+                          style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: '50%', border: '2px solid var(--gold)', cursor: 'zoom-in' }} 
+                        />
                       ) : (
                         <div style={{ width:60, height:60, borderRadius:'50%', background:'var(--panel2)', border:'2px solid var(--gold)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, fontWeight:700, color:'var(--gold-light)', flexShrink:0 }}>
                           {iniciales(detalleActivo.data)}
@@ -512,6 +525,20 @@ export default function ChoferesPage() {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* MODAL PARA IMAGEN AMPLIADA (CHOFERES) */}
+      {imagenAmpliada && (
+        <div 
+          onClick={() => setImagenAmpliada(null)}
+          style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(10,12,17,0.9)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999999, cursor: 'zoom-out', padding: '20px' }}
+        >
+          <img 
+            src={imagenAmpliada} 
+            alt="Vista ampliada" 
+            style={{ width: '100%', height: '85vh', maxWidth: '900px', borderRadius: '12px', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', objectFit: 'contain', animation: 'fadeInModal 0.2s ease-out' }} 
+          />
         </div>
       )}
 
