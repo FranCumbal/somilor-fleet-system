@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react'
 import { combustibleAPI, vehiculosAPI, choferesAPI } from '../services/api'
 import { Panel, PanelHeader, PageHeader, Btn, LoadingSpinner, EmptyState, Chip } from '../components/layout/UI'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { generarPDF } from '../utils/exportPdf'
+import { generarReporteCombustiblePDF, generarFichaCombustiblePDF } from '../utils/exportPdf' // ACTUALIZADO
 
 const idUnico = () => Math.random().toString(36).substr(2, 9)
 const getLocalNow = () => new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)
-const estadoInicial = { vehiculo_id:'', chofer_id:'', costo_total:'', fecha:'', observaciones:'' }
+const estadoInicial = { vehiculo_id:'', chofer_id:'', costo_total:'', galones:'', fecha:'', observaciones:'' }
 
 const preventInvalidChars = (e) => {
   if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault()
@@ -144,6 +144,7 @@ export default function CombustiblePage() {
           vehiculo_id:   parseInt(f.vehiculo_id),
           chofer_id:     f.chofer_id ? parseInt(f.chofer_id) : null,
           costo_total:   parseFloat(f.costo_total),
+          galones:       f.galones ? parseFloat(f.galones) : null,
           fecha:         f.fecha ? new Date(f.fecha).toISOString() : null,
           observaciones: f.observaciones || null,
         })
@@ -152,6 +153,7 @@ export default function CombustiblePage() {
           vehiculo_id:   parseInt(f.vehiculo_id),
           chofer_id:     f.chofer_id ? parseInt(f.chofer_id) : null,
           costo_total:   parseFloat(f.costo_total),
+          galones:       f.galones ? parseFloat(f.galones) : null,
           fecha:         f.fecha ? new Date(f.fecha).toISOString() : null,
           observaciones: f.observaciones || null,
         })))
@@ -168,6 +170,7 @@ export default function CombustiblePage() {
       vehiculo_id:   t.vehiculo_id  || '',
       chofer_id:     t.chofer_id    || '',
       costo_total:   t.costo_total  || '',
+      galones:       t.galones      || '', 
       fecha:         t.fecha ? new Date(new Date(t.fecha).getTime() - new Date(t.fecha).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : getLocalNow(),
       observaciones: t.observaciones || ''
     }])
@@ -220,29 +223,19 @@ export default function CombustiblePage() {
     </div>
   ) : null
 
+  // ACTUALIZADO: Llamar a la nueva función de reporte
   const handleExportarPDF = () => {
-    const columnas = [
-      { header: 'Fecha', render: (fila) => new Date(fila.fecha).toLocaleDateString('es-EC') },
-      { header: 'Unidad (Placa)', render: (fila) => fila.vehiculo?.placa || `V-${fila.vehiculo_id}` },
-      { header: 'Chofer', render: (fila) => fila.chofer ? `${fila.chofer.nombre} ${fila.chofer.apellido}` : 'Sin asignar' },
-      { header: 'Costo ($)', render: (fila) => `$${(fila.costo_total || 0).toFixed(2)}` },
-      { header: 'Observaciones', dataKey: 'observaciones' }
-    ];
-    // Pasamos tanqueosConBusqueda, que ya tiene los filtros de fecha y búsqueda aplicados
-    generarPDF(`Reporte de Combustible - ${periodoActivo.toUpperCase()}`, columnas, tanqueosConBusqueda, 'Combustible_SOMILOR');
+    generarReporteCombustiblePDF(`Reporte de Combustible - ${periodoActivo.toUpperCase()}`, tanqueosConBusqueda, 'Combustible_SOMILOR');
   };
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:20, minWidth:0, width:'100%', position:'relative' }}>
       <PageHeader title="Control Financiero de Flota" subtitle="Registro de gastos por abastecimiento">
-        
-        {/* Nuevo botón de exportar */}
         {!showForm && (
           <Btn variant="ghost" onClick={handleExportarPDF} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            📄 Exportar PDF
+            📄 Exportar Lista General
           </Btn>
         )}
-
         <Btn variant={showForm ? 'ghost' : 'primary'} onClick={() => { cerrarFormulario(); setShowForm(!showForm) }}>
           {showForm ? 'Volver al panel' : '+ Registrar Gasto'}
         </Btn>
@@ -282,6 +275,13 @@ export default function CombustiblePage() {
                   <input type="datetime-local" value={f.fecha}
                     onChange={e => updateField(f.idRef, 'fecha', e.target.value)} required
                     style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none', fontFamily:'DM Sans' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Cantidad (Galones)</label>
+                  <input type="number" min="0.01" step="any" placeholder="Ej: 15.5"
+                    value={f.galones} onChange={e => updateField(f.idRef, 'galones', e.target.value)}
+                    onKeyDown={preventInvalidChars}
+                    style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none' }} />
                 </div>
                 <div>
                   <label style={{ fontSize:12, color:'var(--gold)', display:'block', marginBottom:6, fontWeight:700 }}>Costo Total ($) *</label>
@@ -475,10 +475,19 @@ export default function CombustiblePage() {
               ) : (
                 <div>
                   <div style={{ textAlign:'center', marginBottom:25, paddingBottom:20, borderBottom:'1px dashed var(--border-soft)' }}>
+                    
+                    {/* AÑADIDO: Botón para Imprimir Recibo Individual */}
+                    <Btn variant="primary" onClick={() => generarFichaCombustiblePDF(detalleActivo.data)} style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', marginBottom: '15px' }}>
+                      📄 Imprimir Ficha de Consumo
+                    </Btn>
+
                     <div style={{ fontSize:12, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:1 }}>Costo Registrado</div>
                     <div style={{ fontSize:42, fontWeight:800, color:'var(--gold-light)', fontFamily:'Space Mono', margin:'10px 0' }}>
                       ${(detalleActivo.data.costo_total || 0).toFixed(2)}
                     </div>
+                    {detalleActivo.data.galones && (
+                      <div style={{ fontSize:14, color:'var(--blue)', fontWeight: 'bold', marginBottom: '5px' }}>{detalleActivo.data.galones} Galones abastecidos</div>
+                    )}
                     <div style={{ fontSize:13, color:'var(--text-2)' }}>Registrado el: {new Date(detalleActivo.data.fecha).toLocaleString('es-EC')}</div>
                   </div>
                   <div style={{ display:'flex', flexDirection:'column', gap:12, fontSize:13, color:'var(--text-2)', padding:'15px', background:'var(--panel2)', borderRadius:8 }}>

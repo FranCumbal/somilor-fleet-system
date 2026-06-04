@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { vehiculosAPI } from '../services/api'
-import { Panel, PanelHeader, PageHeader, Btn, LoadingSpinner, EmptyState, StatusPill } from '../components/layout/UI'
+import { vehiculosAPI, combustibleAPI, mantenimientoAPI } from '../services/api'
+import { Panel, PanelHeader, PageHeader, Btn, LoadingSpinner, EmptyState, StatusPill, Chip } from '../components/layout/UI' // <-- AÑADIDO: Chip
 import { generarPDF, generarFichaVehiculoPDF } from '../utils/exportPdf'
 
 const idUnico = () => Math.random().toString(36).substr(2, 9)
@@ -26,9 +26,17 @@ export default function VehiculosPage() {
   const [error, setError]             = useState('')
   const [detalleActivo, setDetalleActivo] = useState(null)
   const [busqueda, setBusqueda]       = useState('')
-  const [imagenAmpliada, setImagenAmpliada] = useState(null)
   const [pagina, setPagina]           = useState(1)
   const POR_PAGINA                    = 15
+  const [imagenAmpliada, setImagenAmpliada] = useState(null)
+
+  // =======================================
+  // ESTADOS PARA EXPORTACIÓN AVANZADA
+  // =======================================
+  const [exportConfig, setExportConfig] = useState(false);
+  const [incCombustible, setIncCombustible] = useState(false);
+  const [incMantenimiento, setIncMantenimiento] = useState(false);
+  const [generandoPdf, setGenerandoPdf] = useState(false);
 
   const cargar = () => {
     setLoading(true)
@@ -54,7 +62,7 @@ export default function VehiculosPage() {
     e.preventDefault(); setSaving(true); setError('')
     for (const f of formularios) {
       if (!f.placa) {
-        setError('La placa o código es obligatoria.')
+        setError(`La placa o código es obligatoria.`)
         setSaving(false); return
       }
     }
@@ -62,24 +70,14 @@ export default function VehiculosPage() {
       if (editandoId) {
         const payload = { ...formularios[0] }
         delete payload.idRef
-        
-        // 1. LIMPIEZA AUTOMÁTICA: Pasa los campos vacíos a 'null' para que la BD no falle
-        Object.keys(payload).forEach(key => {
-          if (payload[key] === '') payload[key] = null;
-        });
-
+        Object.keys(payload).forEach(key => { if (payload[key] === '') payload[key] = null; });
         payload.kilometraje_actual = payload.kilometraje_actual ? parseFloat(payload.kilometraje_actual) : 0
         await vehiculosAPI.update(editandoId, payload)
       } else {
         const promesas = formularios.map(f => {
           const payload = { ...f }
           delete payload.idRef
-          
-          // 1. LIMPIEZA AUTOMÁTICA: Pasa los campos vacíos a 'null'
-          Object.keys(payload).forEach(key => {
-            if (payload[key] === '') payload[key] = null;
-          });
-
+          Object.keys(payload).forEach(key => { if (payload[key] === '') payload[key] = null; });
           payload.kilometraje_actual = payload.kilometraje_actual ? parseFloat(payload.kilometraje_actual) : 0
           return vehiculosAPI.create(payload)
         })
@@ -87,16 +85,15 @@ export default function VehiculosPage() {
       }
       cerrarFormulario(); cargar()
     } catch (err) {
-      // 2. PREVENCIÓN DE PANTALLA NEGRA: Si el backend devuelve un arreglo de errores
       const detail = err.response?.data?.detail;
-      const errorMsg = Array.isArray(detail) ? 'Error de validación. Revisa que los números y fechas tengan el formato correcto.' : (detail || 'Error al guardar. Verifica que las placas no estén repetidas.');
+      const errorMsg = Array.isArray(detail) ? 'Error de validación. Revisa el formato de los datos.' : (detail || 'Error al guardar. Verifica que las placas no estén repetidas.');
       setError(errorMsg)
     } finally { setSaving(false) }
   }
 
   const cargarDatosEdicion = (v) => {
     setEditandoId(v.id)
-    setActiveTab('base') // Nos aseguramos de iniciar en la pestaña 1 al editar
+    setActiveTab('base') 
     setFormularios([{
       idRef:                      idUnico(),
       placa:                      v.placa  || '',
@@ -231,6 +228,32 @@ export default function VehiculosPage() {
     generarPDF('Inventario de Flota', columnas, vehiculosFiltrados, 'Flota_SOMILOR');
   };
 
+  // =======================================
+  // FUNCIÓN: EJECUTAR EXPORTACIÓN AVANZADA
+  // =======================================
+  const ejecutarExportacionAvanzada = async () => {
+    setGenerandoPdf(true);
+    try {
+      let datosComb = [];
+      let datosMant = [];
+      if (incCombustible || incMantenimiento) {
+        const [resComb, resMant] = await Promise.all([
+          incCombustible ? combustibleAPI.list({ limit: 1000 }) : Promise.resolve({data: []}),
+          incMantenimiento ? mantenimientoAPI.list({ limit: 1000 }) : Promise.resolve({data: []})
+        ]);
+        if (incCombustible) datosComb = resComb.data.filter(c => c.vehiculo_id === detalleActivo.data.id);
+        if (incMantenimiento) datosMant = resMant.data.filter(m => m.vehiculo_id === detalleActivo.data.id);
+      }
+      await generarFichaVehiculoPDF(detalleActivo.data, { comb: incCombustible, mant: incMantenimiento }, datosComb, datosMant);
+      setExportConfig(false); setIncCombustible(false); setIncMantenimiento(false);
+    } catch (error) {
+      console.error(error);
+      alert("Error al extraer los historiales. Verifica tu conexión.");
+    } finally {
+      setGenerandoPdf(false);
+    }
+  };
+
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:20, minWidth:0, width:'100%', position:'relative' }}>
       <PageHeader title="Inventario de Flota" subtitle="Gestión de unidades y maquinaria">
@@ -266,7 +289,6 @@ export default function VehiculosPage() {
               </PanelHeader>
 
               <div style={{ padding:20 }}>
-                {/* 1. CONTROL DE PESTAÑAS */}
                 <div style={{ display: 'flex', gap: '10px', borderBottom: '1px solid var(--border-soft)', marginBottom: '20px', paddingBottom: '10px', overflowX: 'auto' }}>
                   <button type="button" onClick={() => setActiveTab('base')} style={{ padding: '8px 16px', borderRadius: '6px', background: activeTab === 'base' ? 'var(--gold)' : 'transparent', color: activeTab === 'base' ? '#0E1117' : 'var(--text-1)', border: 'none', cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap', transition: 'all 0.2s' }}>
                     1. Datos Base
@@ -279,7 +301,6 @@ export default function VehiculosPage() {
                   </button>
                 </div>
 
-                {/* 2. TARJETA 1: DATOS BASE */}
                 {activeTab === 'base' && (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                     <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Placa Actual *</label><input type="text" value={f.placa} onChange={e => updateField(f.idRef, 'placa', e.target.value)} required style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
@@ -294,7 +315,6 @@ export default function VehiculosPage() {
                   </div>
                 )}
 
-                {/* 3. TARJETA 2: ESPECIFICACIONES TÉCNICAS */}
                 {activeTab === 'tecnicos' && (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                     <div>
@@ -315,7 +335,6 @@ export default function VehiculosPage() {
                   </div>
                 )}
 
-                {/* 4. TARJETA 3: DATOS LEGALES */}
                 {activeTab === 'legales' && (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                     <div style={{ gridColumn: '1 / -1' }}><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Nombres Titular</label><input type="text" value={f.titular_nombres || ''} onChange={e => updateField(f.idRef, 'titular_nombres', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
@@ -327,7 +346,6 @@ export default function VehiculosPage() {
                     <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>RUAT</label><input type="text" value={f.ruat || ''} onChange={e => updateField(f.idRef, 'ruat', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
                     <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Fecha Matrícula</label><input type="date" value={f.fecha_matricula || ''} onChange={e => updateField(f.idRef, 'fecha_matricula', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
                     <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Fecha Caducidad</label><input type="date" value={f.fecha_expiracion_matricula || ''} onChange={e => updateField(f.idRef, 'fecha_expiracion_matricula', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
-                    <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Total Matrícula ($)</label><input type="number" step="0.01" value={f.total_matricula || ''} onChange={e => updateField(f.idRef, 'total_matricula', e.target.value ? parseFloat(e.target.value) : '')} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
                     <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Avalúo ($)</label><input type="number" step="0.01" value={f.avaluo_vehiculo || ''} onChange={e => updateField(f.idRef, 'avaluo_vehiculo', e.target.value ? parseFloat(e.target.value) : '')} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
                     <div><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Digitador</label><input type="text" value={f.digitador_matricula || ''} onChange={e => updateField(f.idRef, 'digitador_matricula', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
                     <div style={{ gridColumn: '1 / -1' }}><label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Observaciones</label><input type="text" value={f.observacion_matricula || ''} onChange={e => updateField(f.idRef, 'observacion_matricula', e.target.value)} style={{ width:'100%', padding:'9px 12px', background:'var(--panel2)', border:'1px solid var(--border-soft)', color:'var(--text-1)', borderRadius:8, fontSize:13 }} /></div>
@@ -443,14 +461,45 @@ export default function VehiculosPage() {
       )}
 
       {detalleActivo && (
-        <div onClick={() => setDetalleActivo(null)}
+        <div onClick={() => { setDetalleActivo(null); setExportConfig(false); setIncCombustible(false); setIncMantenimiento(false); }}
           style={{ position:'fixed', top:0, left:0, width:'100vw', height:'100vh', background:'rgba(10,12,17,0.85)', backdropFilter:'blur(5px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:10000, animation:'fadeInModal 0.2s ease-out', padding:'20px' }}>
           <div onClick={e => e.stopPropagation()}
-            style={{ width:'100%', maxWidth:Array.isArray(detalleActivo.data) ? '700px' : '550px', background:'var(--panel)', borderRadius:16, padding:'30px', border:'1px solid var(--border-soft)', boxShadow:'0 20px 50px rgba(0,0,0,0.5)', maxHeight:'90vh', overflowY:'auto' }}>
+            style={{ width:'100%', maxWidth:Array.isArray(detalleActivo.data) ? '700px' : '650px', background:'var(--panel)', borderRadius:16, padding:'30px', border:'1px solid var(--border-soft)', boxShadow:'0 20px 50px rgba(0,0,0,0.5)', maxHeight:'90vh', overflowY:'auto' }}>
+            
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20, paddingBottom:15, borderBottom:'1px solid var(--border-soft)' }}>
               <h2 style={{ margin:0, color:'var(--gold-light)', fontSize:18 }}>{detalleActivo.tipo}</h2>
-              <button onClick={() => setDetalleActivo(null)} style={{ background:'transparent', border:'none', color:'var(--text-3)', fontSize:24, cursor:'pointer' }}>×</button>
+              
+              <div style={{ display: 'flex', gap: 15, alignItems: 'center' }}>
+                
+                {/* OPCIONES DE EXPORTACIÓN AVANZADA (DISEÑO CHIPS) */}
+                {(!Array.isArray(detalleActivo.data)) && (
+                  !exportConfig ? (
+                    <Btn variant="primary" onClick={() => setExportConfig(true)} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      📄 Exportar PDF
+                    </Btn>
+                  ) : (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--panel2)', padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border-soft)', animation: 'fadeInModal 0.2s ease-out' }}>
+                      <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginRight: 4 }}>Anexar:</span>
+                      
+                      <Chip active={true} style={{ cursor: 'default', opacity: 0.8 }}>Ficha</Chip>
+                      <Chip active={incCombustible} onClick={() => setIncCombustible(!incCombustible)}>+ Combustible</Chip>
+                      <Chip active={incMantenimiento} onClick={() => setIncMantenimiento(!incMantenimiento)}>+ Mantenimientos</Chip>
+                      
+                      <div style={{ width: 1, height: 20, background: 'var(--border-soft)', margin: '0 4px' }} />
+                      
+                      <button onClick={ejecutarExportacionAvanzada} disabled={generandoPdf} 
+                        style={{ padding: '6px 14px', borderRadius: '6px', background: 'var(--gold)', color: '#0E1117', border: 'none', fontWeight: 600, cursor: generandoPdf ? 'wait' : 'pointer', fontSize: 12, transition: 'all 0.2s', opacity: generandoPdf ? 0.7 : 1 }}>
+                        {generandoPdf ? 'Generando...' : '📥 Descargar'}
+                      </button>
+                      <button onClick={() => setExportConfig(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-3)', fontSize: 20, cursor: 'pointer', padding: '0 4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                    </div>
+                  )
+                )}
+                
+                <button onClick={() => { setDetalleActivo(null); setExportConfig(false); setIncCombustible(false); setIncMantenimiento(false); }} style={{ background:'transparent', border:'none', color:'var(--text-3)', fontSize:24, cursor:'pointer' }}>×</button>
+              </div>
             </div>
+
             <div style={{ color:'var(--text-2)' }}>
               {Array.isArray(detalleActivo.data) ? (
                 <div style={{ overflowX:'auto' }}>
@@ -481,36 +530,29 @@ export default function VehiculosPage() {
                 </div>
               ) : (
                 <div>
-                  <div style={{ display:'flex', alignItems:'center', justifyContent: 'space-between', marginBottom:25 }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:15 }}>
-                      <div style={{ position: 'relative' }}>
-                        {detalleActivo.data.foto_url ? (
-                          <img 
-                            src={`http://${window.location.hostname}:8000${detalleActivo.data.foto_url}`} 
-                            alt="Foto" 
-                            onClick={(e) => { e.stopPropagation(); setImagenAmpliada(`http://${window.location.hostname}:8000${detalleActivo.data.foto_url}`) }}
-                            style={{ width: 70, height: 70, objectFit: 'cover', borderRadius: '8px', border: '2px solid var(--gold)', cursor: 'zoom-in' }} 
-                          />
-                        ) : (
-                          <div style={{ width:70, height:70, borderRadius:'8px', background:'var(--panel2)', border:'2px solid var(--gold)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:28, flexShrink:0 }}>
-                            {detalleActivo.data.tipo === 'maquinaria' ? '🚜' : '🚛'}
-                          </div>
-                        )}
-                        <label style={{ position: 'absolute', bottom: -5, right: -5, background: 'var(--panel3)', cursor: 'pointer', padding: '4px', borderRadius: '50%', border: '1px solid var(--border)', fontSize: 12 }} title="Cambiar foto">
-                          📷
-                          <input type="file" style={{ display: 'none' }} accept="image/*" onChange={(e) => handleUploadDocumento(e, 'foto', detalleActivo.data.id)} />
-                        </label>
-                      </div>
-                      <div>
-                        <div style={{ fontSize:24, fontWeight:'bold', color:'#fff', fontFamily:'Space Mono' }}>{detalleActivo.data.placa}</div>
-                        <div style={{ fontSize:13, color:'var(--gold-light)', marginTop:4 }}>{detalleActivo.data.marca} {detalleActivo.data.modelo} ({detalleActivo.data.anio || 'N/A'})</div>
-                      </div>
+                  <div style={{ display:'flex', alignItems:'center', gap:15, marginBottom:25 }}>
+                    <div style={{ position: 'relative' }}>
+                      {detalleActivo.data.foto_url ? (
+                        <img 
+                          src={`http://${window.location.hostname}:8000${detalleActivo.data.foto_url}`} 
+                          alt="Foto" 
+                          onClick={(e) => { e.stopPropagation(); setImagenAmpliada(`http://${window.location.hostname}:8000${detalleActivo.data.foto_url}`) }}
+                          style={{ width: 70, height: 70, objectFit: 'cover', borderRadius: '8px', border: '2px solid var(--gold)', cursor: 'zoom-in' }} 
+                        />
+                      ) : (
+                        <div style={{ width:70, height:70, borderRadius:'8px', background:'var(--panel2)', border:'2px solid var(--gold)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:28, flexShrink:0 }}>
+                          {detalleActivo.data.tipo === 'maquinaria' ? '🚜' : '🚛'}
+                        </div>
+                      )}
+                      <label style={{ position: 'absolute', bottom: -5, right: -5, background: 'var(--panel3)', cursor: 'pointer', padding: '4px', borderRadius: '50%', border: '1px solid var(--border)', fontSize: 12 }} title="Cambiar foto">
+                        📷
+                        <input type="file" style={{ display: 'none' }} accept="image/*" onChange={(e) => handleUploadDocumento(e, 'foto', detalleActivo.data.id)} />
+                      </label>
                     </div>
-                    
-                    {/* BOTÓN PARA EXPORTAR FICHA INDIVIDUAL PDF */}
-                    <Btn variant="primary" onClick={() => generarFichaVehiculoPDF(detalleActivo.data)} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      📄 Ficha PDF
-                    </Btn>
+                    <div>
+                      <div style={{ fontSize:24, fontWeight:'bold', color:'#fff', fontFamily:'Space Mono' }}>{detalleActivo.data.placa}</div>
+                      <div style={{ fontSize:13, color:'var(--gold-light)', marginTop:4 }}>{detalleActivo.data.marca} {detalleActivo.data.modelo} ({detalleActivo.data.anio || 'N/A'})</div>
+                    </div>
                   </div>
                   
                   <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:15, marginBottom:20 }}>

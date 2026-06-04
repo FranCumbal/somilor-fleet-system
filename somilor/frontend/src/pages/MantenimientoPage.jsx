@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { mantenimientoAPI, vehiculosAPI } from '../services/api'
 import { Panel, PanelHeader, PageHeader, Btn, StatusPill, Chip, LoadingSpinner, EmptyState } from '../components/layout/UI'
-import { generarPDF } from '../utils/exportPdf'
+import { generarReporteMantenimientoPDF, generarFichaMantenimientoPDF } from '../utils/exportPdf'
 
 const idUnico = () => Math.random().toString(36).substr(2, 9)
 const estadoInicialForm = { tipo_vehiculo:'', vehiculo_id:'', tipo:'preventivo', descripcion:'', fecha_programada:'', km_programado:'', taller:'', costo:'', observaciones:'' }
@@ -17,6 +17,7 @@ export default function MantenimientoPage() {
   const [alertas, setAlertas]               = useState(null)
   const [loading, setLoading]               = useState(true)
   const [filtro, setFiltro]                 = useState('todos')
+  const [periodoActivo, setPeriodoActivo]   = useState('todo') // <-- NUEVO ESTADO DE PERÍODO
   const [showForm, setShowForm]             = useState(false)
   const [editandoId, setEditandoId]         = useState(null)
   const [formularios, setFormularios]       = useState([{ idRef: idUnico(), ...estadoInicialForm }])
@@ -48,9 +49,34 @@ export default function MantenimientoPage() {
   }
 
   useEffect(() => { cargar() }, [filtro])
-  useEffect(() => { setPagina(1) }, [filtro, busqueda])
+  // ACTUALIZADO: Resetear página al cambiar el período
+  useEffect(() => { setPagina(1) }, [filtro, busqueda, periodoActivo])
 
-  const mantenimientosFiltrados = mantenimientos.filter(m => {
+  // ==========================================
+  // LÓGICA DE FILTRADO POR PERÍODO
+  // ==========================================
+  const getFechaInicio = () => {
+    const d = new Date(); d.setHours(0, 0, 0, 0)
+    switch (periodoActivo) {
+      case 'hoy':    return d
+      case 'semana': {
+        const day = d.getDay()
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+        return new Date(new Date(d).setDate(diff))
+      }
+      case 'mes':  return new Date(d.getFullYear(), d.getMonth(), 1)
+      case 'ano':  return new Date(d.getFullYear(), 0, 1)
+      default:     return new Date(0) // Histórico
+    }
+  }
+
+  // Usa fecha programada o fecha de creación como referencia
+  const getFechaRef = (m) => m.fecha_programada ? new Date(m.fecha_programada) : (m.creado_en ? new Date(m.creado_en) : new Date(0))
+  
+  const mantenimientosPorPeriodo = mantenimientos.filter(m => getFechaRef(m) >= getFechaInicio())
+
+  // Búsqueda aplica sobre los ya filtrados por período
+  const mantenimientosFiltrados = mantenimientosPorPeriodo.filter(m => {
     if (!busqueda.trim()) return true
     const q = busqueda.toLowerCase()
     return (
@@ -69,9 +95,11 @@ export default function MantenimientoPage() {
 
   const ahora    = new Date()
   const en7Dias  = new Date(ahora.getTime() + 7 * 24 * 60 * 60 * 1000)
-  const mantsVencidos    = mantenimientos.filter(m => m.estado === 'vencido' || (m.estado === 'programado' && m.fecha_programada && new Date(m.fecha_programada) < ahora))
-  const mantsProximos    = mantenimientos.filter(m => m.estado === 'programado' && m.fecha_programada && new Date(m.fecha_programada) >= ahora && new Date(m.fecha_programada) <= en7Dias)
-  const mantsCompletados = mantenimientos.filter(m => m.estado === 'completado')
+  
+  // Las estadísticas ahora respetan el período activo
+  const mantsVencidos    = mantenimientosPorPeriodo.filter(m => m.estado === 'vencido' || (m.estado === 'programado' && m.fecha_programada && new Date(m.fecha_programada) < ahora))
+  const mantsProximos    = mantenimientosPorPeriodo.filter(m => m.estado === 'programado' && m.fecha_programada && new Date(m.fecha_programada) >= ahora && new Date(m.fecha_programada) <= en7Dias)
+  const mantsCompletados = mantenimientosPorPeriodo.filter(m => m.estado === 'completado')
 
   const updateField = (idRef, field, value) => {
     setFormularios(prev => {
@@ -213,15 +241,9 @@ export default function MantenimientoPage() {
   ) : null
 
   const handleExportarPDF = () => {
-    const columnas = [
-      { header: 'F. Programada', render: (fila) => fila.fecha_programada ? new Date(fila.fecha_programada).toLocaleDateString('es-EC') : '—' },
-      { header: 'Unidad', render: (fila) => fila.vehiculo?.placa || `V-${fila.vehiculo_id}` },
-      { header: 'Tipo', render: (fila) => fila.tipo ? fila.tipo.toUpperCase() : '—' },
-      { header: 'Descripción', dataKey: 'descripcion' },
-      { header: 'Estado', render: (fila) => fila.estado ? fila.estado.replace('_', ' ').toUpperCase() : '—' },
-      { header: 'Taller', dataKey: 'taller' }
-    ];
-    generarPDF('Reporte de Mantenimientos', columnas, mantenimientosFiltrados, 'Mantenimiento_SOMILOR');
+    // Título mejorado para mostrar ambos filtros (estado y período)
+    const tituloFiltro = filtro === 'todos' ? '' : ` (${filtro.replace('_', ' ').toUpperCase()})`;
+    generarReporteMantenimientoPDF(`Reporte de Mantenimientos - ${periodoActivo.toUpperCase()}${tituloFiltro}`, mantenimientosFiltrados, 'Mantenimiento_SOMILOR');
   };
 
   return (
@@ -236,7 +258,7 @@ export default function MantenimientoPage() {
 
         {!showForm && (
           <Btn variant="ghost" onClick={handleExportarPDF} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            📄 Exportar PDF
+            📄 Exportar Lista General
           </Btn>
         )}
 
@@ -296,13 +318,13 @@ export default function MantenimientoPage() {
                       </select>
                     </div>
                     <div>
-                      <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Kilometraje</label>
+                      <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Kilometraje Ref.</label>
                       <input type="number" min="0" step="any" placeholder="Ej: 85000" value={f.km_programado}
                         onChange={e => updateField(f.idRef, 'km_programado', e.target.value)} onKeyDown={preventInvalidChars}
                         style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none' }} />
                     </div>
                     <div>
-                      <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Costo Total ($)</label>
+                      <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Costo / Inversión ($)</label>
                       <input type="number" min="0" step="any" placeholder="0.00" value={f.costo}
                         onChange={e => updateField(f.idRef, 'costo', e.target.value)} onKeyDown={preventInvalidChars}
                         style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none' }} />
@@ -320,7 +342,7 @@ export default function MantenimientoPage() {
                       </select>
                     </div>
                     <div>
-                      <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Taller</label>
+                      <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Taller Encargado</label>
                       <input placeholder="Taller Central SOMILOR" value={f.taller} onChange={e => updateField(f.idRef, 'taller', e.target.value)}
                         style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none' }} />
                     </div>
@@ -336,12 +358,12 @@ export default function MantenimientoPage() {
                       </select>
                     </div>
                     <div>
-                      <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Taller</label>
+                      <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Taller Encargado</label>
                       <input placeholder="Taller Central SOMILOR" value={f.taller} onChange={e => updateField(f.idRef, 'taller', e.target.value)}
                         style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none' }} />
                     </div>
                     <div>
-                      <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Costo Extra ($)</label>
+                      <label style={{ fontSize:12, color:'var(--text-2)', display:'block', marginBottom:6 }}>Costo Extra / Inversión ($)</label>
                       <input type="number" min="0" step="any" placeholder="0.00" value={f.costo}
                         onChange={e => updateField(f.idRef, 'costo', e.target.value)} onKeyDown={preventInvalidChars}
                         style={{ width:'100%', background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, padding:'9px 12px', color:'var(--text-1)', fontSize:13, outline:'none' }} />
@@ -385,11 +407,29 @@ export default function MantenimientoPage() {
         </form>
       ) : (
         <>
+          {/* NUEVO: BARRA DE FILTRO POR PERÍODO */}
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:'5px' }}>
+            <span style={{ fontSize:11, color:'var(--text-3)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.1em' }}>Filtrar período:</span>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+              {[
+                { id:'hoy',    label:'Hoy' },
+                { id:'semana', label:'Esta Semana' },
+                { id:'mes',    label:'Este Mes' },
+                { id:'ano',    label:'Este Año' },
+                { id:'todo',   label:'Histórico' },
+              ].map(opt => (
+                <Chip key={opt.id} active={periodoActivo === opt.id} onClick={() => setPeriodoActivo(opt.id)}>
+                  {opt.label}
+                </Chip>
+              ))}
+            </div>
+          </div>
+
           <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14 }}>
             {[
               { label:'Vencidos',       value:mantsVencidos.length,    accent:'var(--red)',   data:mantsVencidos },
               { label:'Próximos 7 días',value:mantsProximos.length,    accent:'var(--amber)', data:mantsProximos },
-              { label:'Total registros',value:mantenimientos.length,   accent:'var(--blue)',  data:mantenimientos },
+              { label:'Total registros',value:mantenimientosPorPeriodo.length,   accent:'var(--blue)',  data:mantenimientosPorPeriodo },
               { label:'Completados',    value:mantsCompletados.length, accent:'var(--green)', data:mantsCompletados },
             ].map(k => (
               <div key={k.label}
@@ -419,7 +459,7 @@ export default function MantenimientoPage() {
               </div>
             </PanelHeader>
 
-            {loading ? <LoadingSpinner /> : mantenimientosFiltrados.length === 0 ? <EmptyState message="Sin registros de mantenimiento" /> : (
+            {loading ? <LoadingSpinner /> : mantenimientosFiltrados.length === 0 ? <EmptyState message="Sin registros de mantenimiento para este período" /> : (
               <>
                 <div className="table-responsive-container" style={{ width:'100%', overflowX:'auto', WebkitOverflowScrolling:'touch', paddingBottom:8 }}>
                   <table style={{ width:'100%', borderCollapse:'collapse', minWidth:'1050px' }}>
@@ -533,6 +573,9 @@ export default function MantenimientoPage() {
                       <div style={{ fontSize:14, color:'var(--gold-light)' }}>{detalleActivo.data.vehiculo?.marca} {detalleActivo.data.vehiculo?.modelo}</div>
                     </div>
                     <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:6 }}>
+                      <Btn variant="primary" onClick={() => generarFichaMantenimientoPDF(detalleActivo.data)} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '10px' }}>
+                        📄 Ficha PDF
+                      </Btn>
                       <StatusPill status={detalleActivo.data.estado} />
                       <StatusPill status={detalleActivo.data.tipo} />
                     </div>

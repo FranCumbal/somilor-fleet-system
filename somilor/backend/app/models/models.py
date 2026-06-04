@@ -130,8 +130,9 @@ class Tanqueo(Base):
     vehiculo_id = Column(Integer, ForeignKey("vehiculos.id"), nullable=False)
     chofer_id = Column(Integer, ForeignKey("choferes.id"), nullable=True)
     fecha = Column(DateTime(timezone=True), server_default=func.now())
-    costo_total = Column(Float, nullable=False) # Ahora este es el protagonista
-    observaciones = Column(Text)
+    costo_total = Column(Float, nullable=False)
+    galones = Column(Float, nullable=True)
+    observaciones = Column(Text, nullable=True)
 
     vehiculo = relationship("Vehiculo", back_populates="tanqueos")
 

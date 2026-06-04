@@ -161,6 +161,7 @@ class TanqueoCreate(BaseModel):
     vehiculo_id: int
     chofer_id: Optional[int] = None
     costo_total: float
+    galones: Optional[float] = None
     fecha: Optional[datetime] = None  
     observaciones: Optional[str] = None
 
