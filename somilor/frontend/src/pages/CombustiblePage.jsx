@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { combustibleAPI, vehiculosAPI, choferesAPI } from '../services/api'
 import { Panel, PanelHeader, PageHeader, Btn, LoadingSpinner, EmptyState, Chip } from '../components/layout/UI'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { generarReporteCombustiblePDF, generarFichaCombustiblePDF } from '../utils/exportPdf' // ACTUALIZADO
+import { generarReporteCombustiblePDF, generarFichaCombustiblePDF } from '../utils/exportPdf' 
 
 const idUnico = () => Math.random().toString(36).substr(2, 9)
 const getLocalNow = () => new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)
@@ -223,7 +223,6 @@ export default function CombustiblePage() {
     </div>
   ) : null
 
-  // ACTUALIZADO: Llamar a la nueva función de reporte
   const handleExportarPDF = () => {
     generarReporteCombustiblePDF(`Reporte de Combustible - ${periodoActivo.toUpperCase()}`, tanqueosConBusqueda, 'Combustible_SOMILOR');
   };
@@ -385,10 +384,11 @@ export default function CombustiblePage() {
             {loading ? <LoadingSpinner /> : tanqueosConBusqueda.length === 0 ? <EmptyState message="Sin registros financieros en este período" /> : (
               <>
                 <div className="table-responsive-container" style={{ width:'100%', overflowX:'auto', WebkitOverflowScrolling:'touch', paddingBottom:8 }}>
-                  <table style={{ width:'100%', borderCollapse:'collapse', minWidth:'700px' }}>
+                  <table style={{ width:'100%', borderCollapse:'collapse', minWidth:'750px' }}>
                     <thead>
                       <tr>
-                        {['Fecha','Unidad','Chofer Responsable','Inversión ($)','Acciones'].map(h => (
+                        {/* AÑADIDO: 'Galones' en los encabezados */}
+                        {['Fecha','Unidad','Chofer Responsable','Galones','Inversión ($)','Acciones'].map(h => (
                           <th key={h} style={{ padding:'10px 20px', textAlign:'left', fontSize:10, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.12em', color:'var(--text-3)', borderBottom:'1px solid var(--border-soft)', background:'var(--panel2)', whiteSpace:'nowrap' }}>{h}</th>
                         ))}
                       </tr>
@@ -412,6 +412,12 @@ export default function CombustiblePage() {
                           <td style={{ padding:'13px 20px', fontSize:13, color:'var(--text-2)', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>
                             {t.chofer ? `${t.chofer.nombre} ${t.chofer.apellido}` : '—'}
                           </td>
+                          
+                          {/* AÑADIDO: Celda de Galones */}
+                          <td style={{ padding:'13px 20px', fontSize:13, color:'var(--text-2)', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap', fontFamily:'Space Mono' }}>
+                            {t.galones ? `${t.galones} gal` : '—'}
+                          </td>
+
                           <td style={{ padding:'13px 20px', fontSize:14, fontWeight:700, fontFamily:'Space Mono', color:'var(--gold-light)', borderBottom:'1px solid var(--border-soft)', whiteSpace:'nowrap' }}>
                             ${(t.costo_total || 0).toFixed(2)}
                           </td>
@@ -476,7 +482,6 @@ export default function CombustiblePage() {
                 <div>
                   <div style={{ textAlign:'center', marginBottom:25, paddingBottom:20, borderBottom:'1px dashed var(--border-soft)' }}>
                     
-                    {/* AÑADIDO: Botón para Imprimir Recibo Individual */}
                     <Btn variant="primary" onClick={() => generarFichaCombustiblePDF(detalleActivo.data)} style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', marginBottom: '15px' }}>
                       📄 Imprimir Ficha de Consumo
                     </Btn>
