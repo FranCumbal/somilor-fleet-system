@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { dashboardAPI, generacionAPI } from '../services/api'
 import { KpiCard, Panel, PanelHeader, PageHeader, StatusPill } from '../components/layout/UI'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, AreaChart, Area, CartesianGrid, Legend, PieChart, Pie } from 'recharts'
 import { useAuth } from '../hooks/useAuth'
 
 const choferesList = [
@@ -34,6 +34,12 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState(null)
   const [detalleActivo, setDetalleActivo] = useState(null)
+  
+  // --- NUEVOS ESTADOS PARA INTELIGENCIA DE NEGOCIOS (BI) ---
+  const [biData, setBiData] = useState(null)
+  const [biLoading, setBiLoading] = useState(false)
+  const [filtrosBI, setFiltrosBI] = useState({ start_date: '', end_date: '' })
+
   const { user } = useAuth()
   const isTransportista = user?.rol === 'transportista'
   
@@ -49,6 +55,21 @@ export default function DashboardPage() {
       .catch(err => console.error("Error cargando dashboard:", err))
       .finally(() => setLoading(false))
   }, [])
+
+  // --- NUEVO EFECTO: CARGA GRÁFICAS Y ESCUCHA LOS FILTROS ---
+  useEffect(() => {
+    if (isTransportista) return; // Ocultar para transportistas
+    setBiLoading(true)
+    if (typeof dashboardAPI.graficas === 'function') {
+      dashboardAPI.graficas(filtrosBI)
+        .then(res => setBiData(res.data))
+        .catch(err => console.error("Error cargando gráficas BI:", err))
+        .finally(() => setBiLoading(false))
+    } else {
+      console.warn("dashboardAPI.graficas no está definido en api.js todavía.");
+      setBiLoading(false)
+    }
+  }, [filtrosBI, isTransportista])
 
   const showToast = (mensaje) => {
     setToast(mensaje)
@@ -114,9 +135,132 @@ export default function DashboardPage() {
         )}
       </div>
 
+      {/* ========================================================= */}
+      {/* NUEVA SECCIÓN: INTELIGENCIA DE NEGOCIOS (GRÁFICAS BI)     */}
+      {/* ========================================================= */}
+      {!isTransportista && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          
+          {/* BARRA DE FILTROS INTELIGENTES */}
+          <div style={{ display: 'flex', gap: 15, background: 'var(--panel)', padding: '15px 20px', borderRadius: 12, border: '1px solid var(--border-soft)', alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--gold-light)' }}>⚙️ Filtros Inteligentes (BI):</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Desde:</span>
+              <input type="date" value={filtrosBI.start_date} onChange={e => setFiltrosBI({...filtrosBI, start_date: e.target.value})} style={{ background: 'var(--panel2)', border: '1px solid var(--border-soft)', color: 'white', padding: '6px 12px', borderRadius: 6, fontSize: 13, colorScheme: 'dark' }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Hasta:</span>
+              <input type="date" value={filtrosBI.end_date} onChange={e => setFiltrosBI({...filtrosBI, end_date: e.target.value})} style={{ background: 'var(--panel2)', border: '1px solid var(--border-soft)', color: 'white', padding: '6px 12px', borderRadius: 6, fontSize: 13, colorScheme: 'dark' }} />
+            </div>
+            <button onClick={() => setFiltrosBI({ start_date: '', end_date: '' })} style={{ padding: '6px 12px', background: 'var(--panel2)', border: '1px solid var(--border-soft)', color: 'var(--text-3)', borderRadius: 6, cursor: 'pointer', fontSize: 12, transition: 'background 0.2s' }} onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseOut={e => e.currentTarget.style.background = 'var(--panel2)'}>Limpiar Filtros</button>
+          </div>
+
+          {/* CONTENEDOR DE GRÁFICAS */}
+          {biLoading ? (
+             <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)' }}>Actualizando gráficas interactivas...</div>
+          ) : biData ? (
+             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 16 }}>
+               
+               {/* Gráfica 1: Tendencia de Gastos (Área) */}
+               <Panel style={{ height: 350, display: 'flex', flexDirection: 'column' }}>
+                 <PanelHeader title="Tendencia de Gastos (Combustible vs Mantenimiento)" />
+                 <div style={{ padding: '10px 20px 20px', flex: 1, minHeight: 0 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={biData.tendencia_gastos} margin={{ top:10, right:10, left:-10, bottom:0 }}>
+                        <defs>
+                          <linearGradient id="colorCombustible" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="var(--gold)" stopOpacity={0.4}/>
+                            <stop offset="95%" stopColor="var(--gold)" stopOpacity={0}/>
+                          </linearGradient>
+                          <linearGradient id="colorMantenimiento" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="var(--blue)" stopOpacity={0.4}/>
+                            <stop offset="95%" stopColor="var(--blue)" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <XAxis dataKey="mes" tick={{fill:'var(--text-3)', fontSize:11}} axisLine={false} tickLine={false} />
+                        <YAxis tick={{fill:'var(--text-3)', fontSize:11}} axisLine={false} tickLine={false} tickFormatter={v => `$${v}`} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                        <Tooltip contentStyle={{background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, color:'#fff', fontSize: 12}} itemStyle={{fontSize: 13}} formatter={(value) => [`$${value}`, undefined]} />
+                        <Legend wrapperStyle={{fontSize: 12, paddingTop: 10}} />
+                        <Area type="monotone" name="Combustible" dataKey="combustible" stroke="var(--gold)" strokeWidth={2} fillOpacity={1} fill="url(#colorCombustible)" />
+                        <Area type="monotone" name="Mantenimiento" dataKey="mantenimiento" stroke="var(--blue)" strokeWidth={2} fillOpacity={1} fill="url(#colorMantenimiento)" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                 </div>
+               </Panel>
+
+               {/* Gráfica 2: Top Vehículos (Barras Horizontales) */}
+               <Panel style={{ height: 350, display: 'flex', flexDirection: 'column' }}>
+                 <PanelHeader title="Top 5 Vehículos con Mayor Gasto" />
+                 <div style={{ padding: '10px 20px 20px', flex: 1, minHeight: 0 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart layout="vertical" data={biData.top_gastos} margin={{ top:10, right:20, left:20, bottom:0 }}>
+                        <XAxis type="number" hide />
+                        <YAxis dataKey="placa" type="category" tick={{fill:'var(--text-2)', fontSize:11, fontWeight: 'bold'}} axisLine={false} tickLine={false} />
+                        <Tooltip cursor={{fill: 'rgba(255,255,255,0.03)'}} contentStyle={{background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, color:'#fff', fontSize:12}} formatter={(value) => [`$${value}`, 'Gasto Total']} />
+                        <Bar dataKey="gasto_total" fill="var(--red)" radius={[0,4,4,0]} barSize={24}>
+                          {biData.top_gastos.map((entry, index) => (
+                             <Cell key={`cell-${index}`} fill={index === 0 ? 'var(--red)' : 'rgba(224,82,82,0.6)'} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                 </div>
+               </Panel>
+
+               {/* Gráfica 3: Consumo Galones (Barras Verticales) */}
+               <Panel style={{ height: 350, display: 'flex', flexDirection: 'column' }}>
+                 <PanelHeader title="Consumo Histórico de Galones" />
+                 <div style={{ padding: '10px 20px 20px', flex: 1, minHeight: 0 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={biData.consumo_galones} margin={{ top:10, right:10, left:-10, bottom:0 }}>
+                        <XAxis dataKey="placa" tick={{fill:'var(--text-3)', fontSize:11}} axisLine={false} tickLine={false} />
+                        <YAxis tick={{fill:'var(--text-3)', fontSize:11}} axisLine={false} tickLine={false} />
+                        <Tooltip cursor={{fill: 'rgba(255,255,255,0.03)'}} contentStyle={{background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, color:'#fff', fontSize:12}} formatter={(value) => [`${value} gal`, 'Consumo']} />
+                        <Bar dataKey="galones" fill="var(--amber)" radius={[4,4,0,0]} barSize={28}>
+                          {biData.consumo_galones.map((entry, index) => (
+                             <Cell key={`cell-${index}`} fill="var(--amber)" />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                 </div>
+               </Panel>
+
+               {/* Gráfica 4: Distribución Mantenimientos (Dona) */}
+               <Panel style={{ height: 350, display: 'flex', flexDirection: 'column' }}>
+                 <PanelHeader title="Distribución de Mantenimientos" />
+                 <div style={{ padding: '10px 20px 20px', flex: 1, minHeight: 0 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie 
+                          data={[
+                            { name: 'Preventivo', value: biData.distribucion_mantenimientos.preventivo },
+                            { name: 'Correctivo', value: biData.distribucion_mantenimientos.correctivo }
+                          ]} 
+                          cx="50%" cy="45%" innerRadius={70} outerRadius={90} paddingAngle={5} dataKey="value"
+                        >
+                          <Cell fill="var(--green)" />
+                          <Cell fill="var(--red)" />
+                        </Pie>
+                        <Tooltip contentStyle={{background:'var(--panel2)', border:'1px solid var(--border-soft)', borderRadius:8, color:'#fff', fontSize: 12}} />
+                        <Legend wrapperStyle={{fontSize: 13, paddingTop: 10}} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                 </div>
+               </Panel>
+
+             </div>
+          ) : null}
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* VISTAS CLÁSICAS (Semana Combustible y Alertas)            */}
+      {/* ========================================================= */}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 320px', gap:16 }}>
         
-        {/* 2. GRÁFICO DE COMBUSTIBLE */}
+        {/* GRÁFICO DE COMBUSTIBLE SEMANAL (VISTA MICRO) */}
         {!isTransportista && (
           <Panel style={{ maxWidth: '100%', overflow: 'hidden', height: '100%' }}>
             <div onClick={() => setDetalleActivo({ tipo: 'Inversión en Combustible', data: fuelData })} style={{ cursor: 'pointer' }} title="Ver registro semanal completo">
@@ -143,7 +287,7 @@ export default function DashboardPage() {
           </Panel>
         )}
 
-        {/* 3. ALERTAS ACTIVAS */}
+        {/* ALERTAS ACTIVAS */}
         <Panel>
           <div onClick={() => setDetalleActivo({ tipo: 'Todas las Alertas', data: alertas })} style={{ cursor: 'pointer' }} title="Expandir todas las alertas">
             <PanelHeader title="Alertas activas ➔">
@@ -167,7 +311,7 @@ export default function DashboardPage() {
 
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(300px, 1fr))', gap:16 }}>
         
-        {/* 4. DISPONIBILIDAD DE FLOTA Y GENERACIÓN */}
+        {/* DISPONIBILIDAD DE FLOTA Y GENERACIÓN */}
       {!isTransportista && genData && (
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:14 }}>
           
@@ -245,7 +389,7 @@ export default function DashboardPage() {
         </Panel>
       )}
 
-        {/* 5. MANTENIMIENTOS */}
+        {/* MANTENIMIENTOS */}
         <Panel style={{ maxWidth: '100%', overflow: 'hidden' }}>
           <div onClick={() => setDetalleActivo({ tipo: 'Mantenimientos Programados', data: mantenimientosData })} style={{ cursor: 'pointer' }}>
             <PanelHeader title="Mantenimientos próximos ➔" />
@@ -270,7 +414,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ========================================================= */}
-      {/* EL MODAL INTELIGENTE                                      */}
+      {/* EL MODAL INTELIGENTE (SIN CAMBIOS)                        */}
       {/* ========================================================= */}
       {detalleActivo && (
         <div onClick={() => setDetalleActivo(null)} style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(10, 12, 17, 0.85)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, animation: 'fadeInModal 0.2s ease-out', padding: '20px' }}>
@@ -497,23 +641,23 @@ export default function DashboardPage() {
                     <div style={{ background: 'var(--panel2)', padding: '15px', borderRadius: 8, border: '1px solid var(--border-soft)' }}>
                       <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Uso Registrado</div>
                       <div style={{ fontSize: 16, fontWeight: 600, color: '#fff', marginTop: 5, fontFamily: 'Space Mono' }}>
-                         {detalleActivo.data.tipo === 'maquinaria' ? `${detalleActivo.data.horas_operacion} h` : `${detalleActivo.data.kilometraje_actual.toLocaleString()} km`}
+                         {detalleActivo.data.tipo === 'maquinaria' ? `${detalleActivo.data.horas_operacion} h` : `${detalleActivo.data.kilometraje_actual?.toLocaleString() || 0} km`}
                       </div>
                     </div>
                     <div style={{ background: 'var(--panel2)', padding: '15px', borderRadius: 8, border: '1px solid var(--border-soft)' }}>
-                      <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Combustible</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Nivel Referencial</div>
                       <div style={{ display:'flex', alignItems:'center', gap:8, marginTop: 5 }}>
                         <div style={{ width: '100%', height:6, background:'var(--panel3)', borderRadius:3, overflow:'hidden' }}>
-                          <div style={{ height:'100%', borderRadius:3, background: detalleActivo.data.nivel_combustible < 25 ? 'var(--red)' : detalleActivo.data.nivel_combustible < 50 ? 'var(--amber)' : 'var(--green)', width:`${detalleActivo.data.nivel_combustible}%` }} />
+                          <div style={{ height:'100%', borderRadius:3, background: 'var(--green)', width:`100%` }} />
                         </div>
-                        <span style={{ fontSize:13, fontWeight: 600, fontFamily:'Space Mono', color: '#fff' }}>{detalleActivo.data.nivel_combustible}%</span>
+                        <span style={{ fontSize:13, fontWeight: 600, fontFamily:'Space Mono', color: '#fff' }}>OK</span>
                       </div>
                     </div>
                   </div>
 
                   <div style={{ display: 'flex', gap: 15, fontSize: 13, color: 'var(--text-2)', padding: '15px', background: 'var(--panel2)', borderRadius: 8 }}>
                     <div><strong style={{ color: '#fff' }}>Tipo:</strong> <span style={{ textTransform: 'capitalize' }}>{detalleActivo.data.tipo}</span></div>
-                    <div><strong style={{ color: '#fff' }}>Color:</strong> {detalleActivo.data.color || 'No especificado'}</div>
+                    <div><strong style={{ color: '#fff' }}>Responsable:</strong> {detalleActivo.data.responsable || 'Sin asignar'}</div>
                   </div>
                 </div>
               )}

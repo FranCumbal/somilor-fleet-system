@@ -101,6 +101,7 @@ export const checklistAPI = {
 
 export const dashboardAPI = {
   kpis: () => api.get('/dashboard/kpis'),
+  graficas: (params) => api.get('/dashboard/graficas', { params }), 
 }
 
 export const asignacionesAPI = {

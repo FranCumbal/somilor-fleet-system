@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, cast, Date, desc
 from datetime import date, datetime, timedelta
+from typing import Optional, List
 from app.database import get_db
 
 from app.models import Vehiculo, Chofer, Tanqueo, Mantenimiento, Checklist, Asignacion
+from app.schemas.schemas import DashboardGraficasOut
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
@@ -164,4 +166,88 @@ def obtener_kpis(db: Session = Depends(get_db)):
         "flota_completa": flota_completa,
         "mantenimientos_data": mantenimientos_data,
         "alertas": alertas
+    }
+
+@router.get("/graficas", response_model=DashboardGraficasOut)
+def obtener_graficas(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    vehiculo_id: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    # 1. Consultas Base
+    q_tanqueos = db.query(Tanqueo).join(Vehiculo)
+    q_mants = db.query(Mantenimiento).join(Vehiculo)
+
+    # 2. Aplicar Filtros Dinámicos (Inteligencia del Dashboard)
+    if start_date:
+        q_tanqueos = q_tanqueos.filter(cast(Tanqueo.fecha, Date) >= start_date)
+        q_mants = q_mants.filter(cast(Mantenimiento.creado_en, Date) >= start_date)
+    if end_date:
+        q_tanqueos = q_tanqueos.filter(cast(Tanqueo.fecha, Date) <= end_date)
+        q_mants = q_mants.filter(cast(Mantenimiento.creado_en, Date) <= end_date)
+    if vehiculo_id:
+        q_tanqueos = q_tanqueos.filter(Tanqueo.vehiculo_id == vehiculo_id)
+        q_mants = q_mants.filter(Mantenimiento.vehiculo_id == vehiculo_id)
+
+    tanqueos = q_tanqueos.all()
+    mants = q_mants.all()
+
+    # -- Gráfica 1: Tendencia de Gastos (Combustible vs Mantenimiento por Mes) --
+    tendencia = {}
+    for t in tanqueos:
+        mes = t.fecha.strftime("%Y-%m") if t.fecha else "Desconocido"
+        if mes not in tendencia: tendencia[mes] = {"combustible": 0.0, "mantenimiento": 0.0}
+        tendencia[mes]["combustible"] += (t.costo_total or 0.0)
+        
+    for m in mants:
+        fecha_ref = m.fecha_realizado or m.creado_en
+        if fecha_ref:
+            mes = fecha_ref.strftime("%Y-%m")
+            if mes not in tendencia: tendencia[mes] = {"combustible": 0.0, "mantenimiento": 0.0}
+            tendencia[mes]["mantenimiento"] += (m.costo or 0.0)
+            
+    tendencia_lista = [
+        {"mes": k, "combustible": round(v["combustible"], 2), "mantenimiento": round(v["mantenimiento"], 2)}
+        for k, v in sorted(tendencia.items())
+    ]
+
+    # -- Gráfica 2: Top 5 Vehículos con Mayor Gasto --
+    gastos_vehiculos = {}
+    for t in tanqueos:
+        placa = t.vehiculo.placa
+        gastos_vehiculos[placa] = gastos_vehiculos.get(placa, 0.0) + (t.costo_total or 0.0)
+    for m in mants:
+        placa = m.vehiculo.placa
+        gastos_vehiculos[placa] = gastos_vehiculos.get(placa, 0.0) + (m.costo or 0.0)
+
+    top_gastos = [
+        {"placa": k, "gasto_total": round(v, 2)}
+        for k, v in sorted(gastos_vehiculos.items(), key=lambda item: item[1], reverse=True)[:5]
+    ]
+
+    # -- Gráfica 3: Consumo de Galones por Vehículo --
+    galones_vehiculos = {}
+    for t in tanqueos:
+        if t.galones:
+            placa = t.vehiculo.placa
+            galones_vehiculos[placa] = galones_vehiculos.get(placa, 0.0) + t.galones
+
+    consumo_galones = [
+        {"placa": k, "galones": round(v, 2)}
+        for k, v in sorted(galones_vehiculos.items(), key=lambda item: item[1], reverse=True)
+    ]
+
+    # -- Gráfica 4: Distribución Preventivo vs Correctivo --
+    preventivos = sum(1 for m in mants if m.tipo.value == 'preventivo')
+    correctivos = sum(1 for m in mants if m.tipo.value == 'correctivo')
+
+    return {
+        "tendencia_gastos": tendencia_lista,
+        "top_gastos": top_gastos,
+        "consumo_galones": consumo_galones,
+        "distribucion_mantenimientos": {
+            "preventivo": preventivos,
+            "correctivo": correctivos
+        }
     }

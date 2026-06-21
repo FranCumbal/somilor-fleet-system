@@ -270,6 +270,30 @@ class DashboardKPIs(BaseModel):
     mantenimientos_proximos: int
     checklists_reprobados_hoy: int
 
+# --- NUEVOS SCHEMAS PARA GRÁFICAS INTERACTIVAS ---
+class GastoMensual(BaseModel):
+    mes: str
+    combustible: float
+    mantenimiento: float
+
+class TopVehiculoGasto(BaseModel):
+    placa: str
+    gasto_total: float
+
+class ConsumoGalones(BaseModel):
+    placa: str
+    galones: float
+
+class DistribucionMantenimiento(BaseModel):
+    preventivo: int
+    correctivo: int
+
+class DashboardGraficasOut(BaseModel):
+    tendencia_gastos: List[GastoMensual]
+    top_gastos: List[TopVehiculoGasto]
+    consumo_galones: List[ConsumoGalones]
+    distribucion_mantenimientos: DistribucionMantenimiento
+
 # ── PERSONAL ──────────────────────────────────────────────
 class PersonalBase(BaseModel):
     nombre:   str
